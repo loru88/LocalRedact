@@ -11,6 +11,9 @@ There is no processing backend, upload endpoint, API key, analytics, or account.
 See [TODO.md](TODO.md) for the roadmap: TXT, optional document profiles, images,
 Word and expanded multi-page PDF support.
 
+This README is the shared guide for humans and agents. [AGENTS.md](AGENTS.md)
+adds a concise code map, development conventions and implementation invariants.
+
 ## Run
 
 Use Node.js 22.12+ (or a newer supported Node release).
@@ -69,8 +72,9 @@ served and model assets must be downloaded/cached. There is no service worker.
 - Explicit redact terms, tax codes, IBANs and bank lines override keep rules.
 - Word coordinates are extracted from MuPDF character quads. A one-point margin
   is added and neighboring rectangles on the same line are joined.
-- Redactions remove PDF content, including covered image pixels and intersecting
-  vector graphics, rather than drawing a reversible overlay.
+- Redactions remove covered text and image pixels rather than drawing a reversible
+  overlay. Vector line art is currently preserved, so vector barcodes or sensitive
+  content drawn as shapes require additional handling.
 - Output is a fresh PDF of the redacted pages with standard/XML metadata removed.
   Original annotations, attachments, outlines and document-level extras are not
   copied. Interactive forms must be flattened locally before processing.
