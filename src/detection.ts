@@ -20,7 +20,7 @@ const byteAlphabet = (() => {
 
 const alignmentError = () =>
   new Error(
-    "The model tokenizer could not be aligned with the original PDF text. No PDF was exported.",
+    "The model tokenizer could not be aligned with the original document text. No document was exported.",
   );
 
 export function tokenSpans(
@@ -94,20 +94,20 @@ export async function detectSensitiveSpans(
       logits.dims[1] !== offsets.length
     )
       throw new Error(
-        "The model returned inconsistent token predictions. No PDF was exported.",
+        "The model returned inconsistent token predictions. No document was exported.",
       );
     const labelCount = logits.dims[2];
     const labels = (model.config as { id2label?: Record<number, string> })
       .id2label;
     if (!labelCount || !labels)
       throw new Error(
-        "The model did not provide privacy labels. No PDF was exported.",
+        "The model did not provide privacy labels. No document was exported.",
       );
     const categories = Array.from({ length: labelCount }, (_, i) => {
       const label = labels[i]?.toLowerCase().replace(/^[bies]-/, "");
       if (label !== "o" && !CATEGORIES.some((c) => c === label))
         throw new Error(
-          "The model returned an unknown privacy label. No PDF was exported.",
+          "The model returned an unknown privacy label. No document was exported.",
         );
       return label;
     });
@@ -120,7 +120,7 @@ export async function detectSensitiveSpans(
         const score = Number(scores[i * labelCount + j]);
         if (!Number.isFinite(score))
           throw new Error(
-            "The model returned invalid confidence scores. No PDF was exported.",
+            "The model returned invalid confidence scores. No document was exported.",
           );
         if (score > highest) {
           highest = score;

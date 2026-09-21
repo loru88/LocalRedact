@@ -11,6 +11,8 @@ export const CATEGORIES = [
 export type Category = (typeof CATEGORIES)[number];
 export type Rect = [number, number, number, number];
 export type Span = [number, number];
+export type DocumentFormat = "pdf" | "txt";
+export type Detect = (text: string) => Promise<Span[]>;
 export interface Word {
   start: number;
   end: number;
@@ -28,7 +30,6 @@ export interface Options {
   redactTerms: string[];
   keepTerms: string[];
   keepRegexes: string[];
-  keepCategories: Category[];
   prefix: string;
 }
 export const DEFAULT_OPTIONS: Options = {
@@ -37,23 +38,25 @@ export const DEFAULT_OPTIONS: Options = {
   redactTerms: [],
   keepTerms: [],
   keepRegexes: [],
-  keepCategories: [],
   prefix: "localredact",
 };
 export interface ProcessRequest {
   type: "process";
   id: string;
   bytes: ArrayBuffer;
+  format: DocumentFormat;
   options: Options;
 }
-export type WorkerResponse =
-  | { type: "progress"; id: string; message: string; fraction?: number }
+export type DocumentOutput =
   | {
-      type: "result";
-      id: string;
+      format: "pdf";
       bytes: ArrayBuffer;
       previews: ArrayBuffer[];
       marks: number;
       pages: number;
     }
+  | { format: "txt"; bytes: ArrayBuffer; text: string; marks: number };
+export type WorkerResponse =
+  | { type: "progress"; id: string; message: string; fraction?: number }
+  | ({ type: "result"; id: string } & DocumentOutput)
   | { type: "error"; id: string; message: string };

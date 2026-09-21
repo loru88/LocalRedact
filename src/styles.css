@@ -576,6 +576,20 @@ progress {
   width: 26px;
   height: 25px;
 }
+.text-preview {
+  margin: 20px 0 0;
+  padding: 20px;
+  min-height: 240px;
+  max-height: 70vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 14px/1.6 monospace;
+  background: #fff;
+  border: 1px solid #dce4de;
+  border-radius: 8px;
+}
+
 .preview-canvas {
   background: #eef1e9;
   border: 1px solid #e1e7d7;

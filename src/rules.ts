@@ -35,6 +35,22 @@ export function termSpans(text: string, terms: string[]): Span[] {
   );
 }
 
+// Text rules are shared by PDF and TXT. Page geometry remains PDF-specific.
+export function textRuleSpans(text: string, options: Options) {
+  const keep = [
+    ...termSpans(text, options.keepTerms),
+    ...options.keepRegexes.flatMap((p) => matches(text, new RegExp(p, "giu"))),
+  ];
+  const mandatory: Span[] = [
+    ...matches(text, ITALIAN_ID),
+    ...termSpans(text, options.redactTerms),
+    ...Array.from(text.matchAll(/[^\r\n]+/g)).flatMap((line): Span[] =>
+      BANK.test(line[0]) ? [[line.index, line.index + line[0].length]] : [],
+    ),
+  ];
+  return { keep, mandatory };
+}
+
 export function validateOptions(options: Options) {
   if (
     !Number.isFinite(options.headerFraction) ||
@@ -115,35 +131,16 @@ export function redactionRects(
   modelSpans: Span[],
 ): Rect[] {
   const { text, words, images } = page;
-  const keep = [
-    ...termSpans(text, options.keepTerms),
-    ...options.keepRegexes.flatMap((p) => matches(text, new RegExp(p, "giu"))),
-  ];
+  const { keep, mandatory } = textRuleSpans(text, options);
   const protectedWords = new Set([
     ...words.flatMap((w, i) => (overlaps(w, keep) ? [i] : [])),
     ...fieldWords(page, /PERIODO|RETRIBUZIONE/i),
     ...fieldWords(page, /NETTO(?:DEL)?MESE/i),
   ]);
-  const mandatory = [
-    ...matches(text, ITALIAN_ID),
-    ...termSpans(text, options.redactTerms),
-  ];
-  const bankLines = new Set<number>();
-  for (const line of new Set(words.map((w) => w.line))) {
-    if (
-      BANK.test(
-        words
-          .filter((w) => w.line === line)
-          .map((w) => text.slice(w.start, w.end))
-          .join(" "),
-      )
-    )
-      bankLines.add(line);
-  }
   const headerLimit =
     bounds[1] + (bounds[3] - bounds[1]) * options.headerFraction;
   const rects = words.flatMap((w, i) => {
-    const forced = overlaps(w, mandatory) || bankLines.has(w.line);
+    const forced = overlaps(w, mandatory);
     const optional =
       overlaps(w, modelSpans) ||
       (options.headerFraction > 0 && w.rect[1] < headerLimit);

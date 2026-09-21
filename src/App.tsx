@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  CATEGORIES,
   DEFAULT_OPTIONS,
+  type DocumentFormat,
   type Options,
   type ProcessRequest,
   type WorkerResponse,
@@ -16,6 +16,8 @@ type Job = {
   message?: string;
   url?: string;
   previews?: string[];
+  textPreview?: string;
+  format?: DocumentFormat;
   outputName?: string;
   marks?: number;
   pages?: number;
@@ -30,16 +32,6 @@ const sizes = (bytes: number) =>
   bytes < 1e6
     ? `${Math.max(1, Math.round(bytes / 1000))} KB`
     : `${(bytes / 1e6).toFixed(1)} MB`;
-const labels: Record<string, string> = {
-  account_number: "Account numbers",
-  private_address: "Addresses",
-  private_email: "Email addresses",
-  private_person: "Names",
-  private_phone: "Phone numbers",
-  private_url: "Private URLs",
-  private_date: "Private dates",
-  secret: "Secrets",
-};
 
 function Icon({
   kind,
@@ -129,9 +121,11 @@ export default function App() {
 
   function addFiles(files: File[]) {
     if (active.current) return;
-    const accepted = files.filter((f) => /\.pdf$/i.test(f.name));
+    const accepted = files.filter((f) => /\.(pdf|txt)$/i.test(f.name));
     setError(
-      accepted.length !== files.length ? "Only PDF files can be added." : "",
+      accepted.length !== files.length
+        ? "Only PDF and TXT documents can be added."
+        : "",
     );
     setJobs((old) => [
       ...old,
@@ -162,7 +156,7 @@ export default function App() {
       instance.onerror = () => {
         pending.current?.reject(
           new Error(
-            "PDF processing stopped unexpectedly. Retry processing or use a smaller PDF.",
+            "Document processing stopped unexpectedly. Retry processing or use a smaller file.",
           ),
         );
         pending.current = null;
@@ -191,7 +185,7 @@ export default function App() {
       for (const job of queue) {
         if (run !== generation.current) break;
         patch(job.id, { status: "processing", message: undefined });
-        setProgress({ message: "Reading PDF locally…", fraction: undefined });
+        setProgress({ message: "Reading document…", fraction: undefined });
         try {
           const bytes = await job.file.arrayBuffer();
           if (run !== generation.current) break;
@@ -201,6 +195,7 @@ export default function App() {
               type: "process",
               id: job.id,
               bytes,
+              format: /\.txt$/i.test(job.file.name) ? "txt" : "pdf",
               options,
             };
             getWorker().postMessage(message, [bytes]);
@@ -209,11 +204,21 @@ export default function App() {
           const index = jobs.findIndex((j) => j.id === job.id) + 1;
           patch(job.id, {
             status: "done",
-            url: blobUrl(result.bytes, "application/pdf"),
-            previews: result.previews.map((p) => blobUrl(p, "image/png")),
+            url: blobUrl(
+              result.bytes,
+              result.format === "pdf"
+                ? "application/pdf"
+                : "text/plain;charset=utf-8",
+            ),
+            format: result.format,
+            previews:
+              result.format === "pdf"
+                ? result.previews.map((p) => blobUrl(p, "image/png"))
+                : undefined,
+            textPreview: result.format === "txt" ? result.text : undefined,
             marks: result.marks,
-            pages: result.pages,
-            outputName: `${options.prefix}_${String(index).padStart(4, "0")}.pdf`,
+            pages: result.format === "pdf" ? result.pages : undefined,
+            outputName: `${options.prefix}_${String(index).padStart(4, "0")}.${result.format}`,
             mode: options.mode,
           });
           setSelected(job.id);
@@ -223,7 +228,9 @@ export default function App() {
           patch(job.id, {
             status: "error",
             message:
-              e instanceof Error ? e.message : "Unable to process this PDF.",
+              e instanceof Error
+                ? e.message
+                : "Unable to process this document.",
           });
         }
       }
@@ -305,16 +312,13 @@ export default function App() {
       </header>
       <main>
         <section className="intro">
-          <div className="eyebrow">PDF REDACTION</div>
-          <h1>Redact sensitive PDF content</h1>
+          <div className="eyebrow">DOCUMENT REDACTION</div>
+          <h1>Redact sensitive document content</h1>
           <p>
-            Select PDFs with searchable text, configure redaction, and review
-            the output. The current rules are designed for Italian payslips.
+            Select PDF or TXT documents, configure redaction, and review the
+            output. PDFs must contain searchable text. Italian payslip text
+            rules currently apply to both formats.
           </p>
-          <div className="intro-note">
-            <Icon kind="shield" size={16} /> Files are processed in your
-            browser. Original files are not modified.
-          </div>
         </section>
 
         <div className="workspace">
@@ -323,9 +327,9 @@ export default function App() {
               <div className="section-heading">
                 <div>
                   <span className="step">01</span>
-                  <h2>Add PDFs</h2>
+                  <h2>Add documents</h2>
                 </div>
-                <span className="muted">Searchable PDFs</span>
+                <span className="muted">PDF or TXT</span>
               </div>
               <button
                 className={`dropzone ${dragging ? "dragging" : ""}`}
@@ -345,16 +349,19 @@ export default function App() {
                 <span className="upload-icon">
                   <Icon kind="upload" size={25} />
                 </span>
-                <strong>Drop PDF files here</strong>
+                <strong>Drop documents here</strong>
                 <span>
                   or <u>browse files</u> on your device
                 </span>
-                <small>Select one or more PDFs. Files are not uploaded.</small>
+                <small>
+                  Select one or more PDF or TXT documents. Files are not
+                  uploaded.
+                </small>
               </button>
               <input
                 ref={input}
                 type="file"
-                accept=".pdf,application/pdf"
+                accept=".pdf,.txt,application/pdf,text/plain"
                 multiple
                 hidden
                 onChange={(e) => {
@@ -398,7 +405,7 @@ export default function App() {
                         <span>
                           {sizes(job.file.size)} ·{" "}
                           {job.status === "done"
-                            ? `${job.pages} page${job.pages === 1 ? "" : "s"} · ${job.marks} redactions${job.mode === "rules" ? " · rules only" : ""}`
+                            ? `${job.format === "pdf" ? `${job.pages} page${job.pages === 1 ? "" : "s"}` : "Text document"} · ${job.marks} redactions${job.mode === "rules" ? " · rules only" : ""}`
                             : job.status === "processing"
                               ? "Processing locally…"
                               : job.status === "ready"
@@ -455,7 +462,7 @@ export default function App() {
                     disabled={!ready}
                     onClick={start}
                   >
-                    Redact {ready > 1 ? `${ready} PDFs` : "PDF"}{" "}
+                    Redact {ready > 1 ? `${ready} documents` : "document"}{" "}
                     <Icon kind="arrow" size={18} />
                   </button>
                 )}
@@ -475,33 +482,35 @@ export default function App() {
                     download={chosen.outputName}
                   >
                     <Icon kind="download" size={16} />
-                    Download PDF
+                    Download document
                   </a>
                 )}
               </div>
-              {chosen?.previews ? (
+              {chosen?.url ? (
                 <>
                   <div className="preview-toolbar">
                     <span>{chosen.outputName}</span>
-                    <div>
-                      <button
-                        aria-label="Previous page"
-                        disabled={page === 0}
-                        onClick={() => setPage((p) => p - 1)}
-                      >
-                        ←
-                      </button>
-                      <span>
-                        {page + 1} / {chosen.previews.length}
-                      </span>
-                      <button
-                        aria-label="Next page"
-                        disabled={page >= chosen.previews.length - 1}
-                        onClick={() => setPage((p) => p + 1)}
-                      >
-                        →
-                      </button>
-                    </div>
+                    {chosen.previews && (
+                      <div>
+                        <button
+                          aria-label="Previous page"
+                          disabled={page === 0}
+                          onClick={() => setPage((p) => p - 1)}
+                        >
+                          ←
+                        </button>
+                        <span>
+                          {page + 1} / {chosen.previews.length}
+                        </span>
+                        <button
+                          aria-label="Next page"
+                          disabled={page >= chosen.previews.length - 1}
+                          onClick={() => setPage((p) => p + 1)}
+                        >
+                          →
+                        </button>
+                      </div>
+                    )}
                   </div>
                   {chosen.mode === "rules" && (
                     <p className="notice">
@@ -509,16 +518,25 @@ export default function App() {
                       an explicit term matches. Names and addresses may remain.
                     </p>
                   )}
-                  <div className="preview-canvas">
-                    <img
-                      src={chosen.previews[page]}
-                      alt={`Redacted PDF, page ${page + 1}`}
-                    />
-                  </div>
+                  {chosen.previews ? (
+                    <div className="preview-canvas">
+                      <img
+                        src={chosen.previews[page]}
+                        alt={`Redacted document, page ${page + 1}`}
+                      />
+                    </div>
+                  ) : (
+                    <pre
+                      className="text-preview"
+                      aria-label="Redacted text document"
+                    >
+                      {chosen.textPreview}
+                    </pre>
+                  )}
                   <p className="review-note">
-                    Check every page before sharing. Automatic detection can
-                    miss personal details, especially in Italian text. This
-                    preview shows the saved PDF.
+                    Review the entire document before sharing. Automatic
+                    detection can miss personal details, especially in Italian
+                    text. This preview shows the saved document.
                   </p>
                 </>
               ) : (
@@ -534,9 +552,9 @@ export default function App() {
                   </div>
                   <h3>No output to preview</h3>
                   <p>
-                    Process a PDF to see the output here.
+                    Process a document to see the output here.
                     <br />
-                    Review each page before downloading.
+                    Review the output before downloading.
                   </p>
                 </div>
               )}
@@ -582,11 +600,11 @@ export default function App() {
                       contents.
                     </p>
                     <p>
-                      Review every page before sharing. Add missed text to
-                      “Always redact”, clear and re-add your files, then process
-                      them again. For details inside images or barcodes, use a
-                      PDF editor that permanently redacts image content if they
-                      remain visible in the preview.
+                      Review the entire document before sharing. Add missed text
+                      to “Always redact”, clear and re-add your files, then
+                      process them again. For details inside images or barcodes,
+                      use a PDF editor that permanently redacts image content if
+                      they remain visible in the preview.
                     </p>
                   </div>
                   <p className="help">
@@ -618,7 +636,7 @@ export default function App() {
               <div className="divider" />
               <div className="range-heading">
                 <label className="field-label" htmlFor="header">
-                  Employer header
+                  Employer header (PDF only)
                 </label>
                 <span>{Math.round(options.headerFraction * 100)}%</span>
               </div>
@@ -633,8 +651,9 @@ export default function App() {
                 }
               />
               <p className="help">
-                Remove words in the top portion of each page and images crossing
-                it. Pay-period and net-pay text are preserved where recognized.
+                PDF only: remove words in the top portion of each page and
+                images crossing it. Recognized pay-period and net-pay fields are
+                preserved. These layout rules do not apply to TXT documents.
               </p>
               <label className="field-label" htmlFor="redact">
                 Always redact
@@ -699,40 +718,8 @@ export default function App() {
                 />
                 <p className="help">
                   Original filenames are replaced, for example:
-                  localredact_0001.pdf
+                  localredact_0001.pdf or localredact_0001.txt
                 </p>
-                {options.mode === "model" && (
-                  <>
-                    <span className="field-label">Skip AI categories</span>
-                    <p className="help">
-                      AI detections in checked categories are ignored. Header
-                      rules, payslip rules and “Always redact” still apply.
-                      Skipping dates also excludes birth and employment dates
-                      from AI redaction.
-                    </p>
-                    <div className="checkbox-grid">
-                      {CATEGORIES.map((category) => (
-                        <label key={category}>
-                          <input
-                            type="checkbox"
-                            checked={options.keepCategories.includes(category)}
-                            onChange={(e) =>
-                              update(
-                                "keepCategories",
-                                e.target.checked
-                                  ? [...options.keepCategories, category]
-                                  : options.keepCategories.filter(
-                                      (c) => c !== category,
-                                    ),
-                              )
-                            }
-                          />
-                          {labels[category]}
-                        </label>
-                      ))}
-                    </div>
-                  </>
-                )}
               </details>
             </fieldset>
             <div className="privacy-note">
@@ -740,9 +727,10 @@ export default function App() {
               <div>
                 <strong>File handling</strong>
                 <p>
-                  PDFs are held in browser memory. Output files remove selected
-                  text and image pixels, and standard and XML metadata. Vector
-                  graphics are currently preserved.
+                  Documents are held in browser memory. TXT output replaces
+                  matched text with [REDACTED]. PDF output removes selected text
+                  and image pixels, and standard and XML metadata. Vector
+                  graphics are preserved.
                 </p>
               </div>
             </div>

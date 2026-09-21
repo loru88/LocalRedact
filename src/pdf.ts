@@ -1,6 +1,6 @@
 import * as mupdf from "mupdf";
 import { redactionRects, union, validateOptions } from "./rules";
-import type { Options, PageText, Rect, Span } from "./types";
+import type { Detect, Options, PageText, Rect } from "./types";
 
 export function extractPage(page: mupdf.PDFPage): PageText {
   const structured = page.toStructuredText("preserve-images");
@@ -58,8 +58,6 @@ export function extractPage(page: mupdf.PDFPage): PageText {
   });
   return result;
 }
-
-export type Detect = (text: string) => Promise<Span[]>;
 
 export async function processPdf(
   bytes: ArrayBuffer,

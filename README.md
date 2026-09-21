@@ -1,14 +1,12 @@
 # LocalRedact
 
-Redact documents. Keep them local.
-
 LocalRedact is a React + TypeScript + Vite app derived from an Italian payslip
-redactor. It currently supports searchable PDFs and still applies payslip-specific
+redactor. It supports searchable PDFs and TXT documents and still applies payslip-specific
 rules; general document profiles and additional formats are planned. Files are
 processed locally in a Web Worker with MuPDF WebAssembly and Transformers.js.
 There is no processing backend, upload endpoint, API key, analytics, or account.
 
-See [TODO.md](TODO.md) for the roadmap: TXT, optional document profiles, images,
+See [TODO.md](TODO.md) for the roadmap: text review controls, document profiles, images,
 Word and expanded multi-page PDF support.
 
 This README is the shared guide for humans and agents. [AGENTS.md](AGENTS.md)
@@ -24,8 +22,8 @@ npm ci
 npm run dev
 ```
 
-Open the localhost URL printed by Vite. Select PDFs, configure protection, click
-**Redact PDF**, inspect every page, and download each output. **Load sample** adds
+Open the localhost URL printed by Vite. Select PDF or TXT documents, configure redaction,
+click **Redact document**, review the output, and download it. **Load sample** adds
 a synthetic document and selects rules-only mode, so you can try the PDF pipeline
 without downloading a model. The original Python project is maintained separately.
 
@@ -43,7 +41,7 @@ need HTTP(S). No server-side application runtime is required.
 - **AI + payslip rules** (default): downloads `openai/privacy-filter` in q4 format
   on first use, approximately 917 MB of model weights plus tokenizer/runtime
   assets. Requests retrieve public assets from Hugging Face and its CDN and the
-  ONNX runtime CDN; PDF contents are never included. Browser caching is best-effort
+  ONNX runtime CDN; document contents are never included. Browser caching is best-effort
   and subject to storage quotas. Model initialization needs more memory than the
   download size. WebGPU requires compatible hardware/browser and HTTPS or
   localhost. AI requires WebGPU: the published quantized models use
@@ -54,7 +52,7 @@ need HTTP(S). No server-side application runtime is required.
   header, explicit term, or another payslip rule covers them. This mode is always
   labelled in results. A model failure never silently switches to rules-only.
 
-PDFs and generated results are held in memory. **Clear files** revokes result URLs;
+Documents and generated results are held in memory. **Clear files** revokes result URLs;
 reloading closes the processing session. **Cancel processing** terminates the
 worker, including an active download/inference. Successful files in a batch remain
 available when another file fails. Settings apply to the next processing run;
@@ -63,11 +61,32 @@ clear and re-add files to regenerate already completed results.
 The app is client-side, but it is not an installable offline PWA: the app must be
 served and model assets must be downloaded/cached. There is no service worker.
 
+## TXT handling
+
+- Add `.txt` files on their own or in a batch with PDFs. Word files and pasted-text
+  input are not supported yet.
+- Input supports UTF-8 (with or without a BOM) and BOM-marked UTF-16 LE/BE. Invalid
+  encodings and NUL-containing input stop that file before AI inference; save such
+  files as UTF-8 text first. Output is always UTF-8 without a BOM.
+- AI detection, explicit terms, keep expressions and existing Italian tax-code,
+  IBAN and banking-line rules also apply to TXT. Header removal and automatic
+  salary-field protection are PDF-only; the header slider does not affect TXT.
+- Matched text is replaced with `[REDACTED]`. Line endings, blank lines and
+  surrounding whitespace are preserved. Overlapping detections are merged.
+  Keep terms/expressions preserve matching character ranges from AI redaction;
+  mandatory rules still override them. All supported AI categories are enabled.
+- Preview displays the same redacted text that is downloaded, as literal text
+  rather than HTML. Outputs use names such as `localredact_0001.txt`. Empty files
+  can be exported unchanged without loading a model.
+- Review the entire result before sharing. To correct a missed term, add it to
+  **Always redact**, clear and re-add the file, and process it again. There is no
+  manual preview editor yet. TXT-only processing does not load the PDF engine.
+
 ## Rules and PDF handling
 
 - Italian tax-code and IBAN patterns, bank-information lines, explicit redaction
   terms, and a configurable employer header (18% by default).
-- Exact keep terms, JavaScript keep regexes, AI category exceptions, and automatic
+- Exact keep terms, JavaScript keep regexes, and automatic
   protection of recognized pay-period and net-pay fields.
 - Explicit redact terms, tax codes, IBANs and bank lines override keep rules.
 - Word coordinates are extracted from MuPDF character quads. A one-point margin
@@ -188,8 +207,10 @@ Minimal Linux installations may also need Playwright's system browser libraries
 Unit/integration tests exercise the real MuPDF engine with synthetic PDFs: text
 removal after reopening, metadata/attachment stripping, keep precedence, rotated
 pages, input preservation, failure handling, Unicode span alignment and chunk
-coverage. Browser tests run the production build, real worker, preview and download
-flow, batch errors and responsive layout. Tests do not upload personal PDFs or
+coverage. TXT tests cover Unicode/encodings, replacement, line endings, keep
+precedence, overlapping detections and failures. Browser tests run the production
+build, real worker, PDF/TXT previews and downloads, mixed batches and responsive
+layout. Tests do not upload personal documents or
 download model weights. A live AI run must be checked separately on target hardware.
 
 An opt-in test downloads the real model and verifies name removal on a synthetic
@@ -206,6 +227,7 @@ PAYSLIP_LIVE_AI=1 PAYSLIP_NATIVE_GPU=1 npm run test:browser -- --grep 'live AI'
 - `src/App.tsx`: file queue, options, worker lifecycle, result previews/downloads.
 - `src/processor.worker.ts`: model loading, progress, inference and orchestration.
 - `src/pdf.ts`: text/coordinate extraction, permanent redaction and PDF export.
+- `src/text.ts`: TXT decoding, span replacement and UTF-8 text export.
 - `src/detection.ts`: byte-accurate token alignment and per-token AI detections.
 - `src/rules.ts`: precedence, keep fields and rectangle merging.
 - `tests/`: synthetic fixtures, integration tests and browser smoke tests.

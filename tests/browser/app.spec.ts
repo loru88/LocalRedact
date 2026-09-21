@@ -10,7 +10,7 @@ test("processes and downloads PDFs entirely locally in the production build", as
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Redact sensitive PDF content",
+    "Redact sensitive document content",
   );
   await page.getByRole("button", { name: /Load sample/ }).click();
   await expect(
@@ -19,11 +19,13 @@ test("processes and downloads PDFs entirely locally in the production build", as
   await expect(page.getByLabel("Detection", { exact: true })).toHaveValue(
     "rules",
   );
-  await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
-  const download = page.getByRole("link", { name: "Download PDF" });
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
+  const download = page.getByRole("link", { name: "Download document" });
   await expect(download).toBeVisible({ timeout: 30000 });
   await expect(
-    page.getByRole("img", { name: "Redacted PDF, page 1" }),
+    page.getByRole("img", { name: "Redacted document, page 1" }),
   ).toBeVisible();
   await expect(
     page.getByText("Rules-only result:", { exact: false }),
@@ -65,11 +67,13 @@ test("shows a per-file OCR error and continues the batch", async ({ page }) => {
       buffer: Buffer.from(fixture()),
     },
   ]);
-  await page.getByRole("button", { name: "Redact 2 PDFs" }).click();
+  await page.getByRole("button", { name: "Redact 2 documents" }).click();
   await expect(page.getByText(/Page 2 has no searchable text/)).toBeVisible({
     timeout: 30000,
   });
-  await expect(page.getByRole("link", { name: "Download PDF" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Download document" }),
+  ).toBeVisible();
   await expect(
     page.getByText("localredact_0002.pdf", { exact: true }),
   ).toBeVisible();
@@ -80,7 +84,9 @@ test("validates configuration before starting", async ({ page }) => {
   await page.getByRole("button", { name: /Load sample/ }).click();
   await page.getByText("Advanced options", { exact: true }).click();
   await page.getByLabel("Keep expressions").fill("[");
-  await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText(
     "Invalid keep expression",
   );
@@ -96,10 +102,12 @@ test("AI download failure never falls back to rules-only export", async ({
   await page.goto("/");
   await page.getByRole("button", { name: /Load sample/ }).click();
   await page.getByLabel("Detection", { exact: true }).selectOption("model");
-  await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
   await expect(page.locator(".file-error")).toBeVisible({ timeout: 30000 });
   await expect(
-    page.getByRole("link", { name: "Download PDF" }),
+    page.getByRole("link", { name: "Download document" }),
   ).not.toBeVisible();
   await expect(page.getByLabel("Detection", { exact: true })).toHaveValue(
     "model",
@@ -118,7 +126,9 @@ test("cancels model loading and can restart in the explicitly selected rules mod
   await page.goto("/");
   await page.getByRole("button", { name: /Load sample/ }).click();
   await page.getByLabel("Detection", { exact: true }).selectOption("model");
-  await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
   await expect.poll(() => releases.length).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Cancel processing" }).click();
   releases.forEach((release) => release());
@@ -127,9 +137,13 @@ test("cancels model loading and can restart in the explicitly selected rules mod
     page.getByText("Cancelled. You can try again.", { exact: false }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "Download PDF" }),
+    page.getByRole("link", { name: "Download document" }),
   ).not.toBeVisible();
   await page.getByLabel("Detection", { exact: true }).selectOption("rules");
-  await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
-  await expect(page.getByRole("link", { name: "Download PDF" })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", { name: "Download document" }),
+  ).toBeVisible();
 });

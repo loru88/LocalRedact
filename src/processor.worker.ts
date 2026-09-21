@@ -52,7 +52,7 @@ self.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
     send({
       type: "error",
       id: data.id,
-      message: "Another PDF is still processing.",
+      message: "Another document is still processing.",
     });
     return;
   }
@@ -61,7 +61,6 @@ self.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
   try {
     // Register onmessage before MuPDF's asynchronous WASM initialization.
     // A top-level import can otherwise lose the first message during startup.
-    const { processPdf } = await import("./pdf");
     const detect = async (text: string): Promise<Span[]> => {
       const model = await getClassifier(id);
       const chunks = textChunks(text);
@@ -74,17 +73,23 @@ self.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
         });
         const chunk = chunks[i];
         spans.push(
-          ...(
-            await detectSensitiveSpans(
-              chunk.text,
-              model,
-              options.keepCategories,
-            )
-          ).map(([s, e]): Span => [s + chunk.offset, e + chunk.offset]),
+          ...(await detectSensitiveSpans(chunk.text, model, [])).map(
+            ([s, e]): Span => [s + chunk.offset, e + chunk.offset],
+          ),
         );
       }
       return spans;
     };
+    if (data.format === "txt") {
+      const { processText } = await import("./text");
+      send({ type: "progress", id, message: "Processing text document…" });
+      const result = await processText(bytes, options, detect);
+      send({ type: "result", id, ...result }, [result.bytes]);
+      return;
+    }
+    if (data.format !== "pdf")
+      throw new Error("Unsupported document format. Select a PDF or TXT file.");
+    const { processPdf } = await import("./pdf");
     const result = await processPdf(bytes, options, detect, (page, total) =>
       send({
         type: "progress",
@@ -93,7 +98,10 @@ self.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
         fraction: (page - 1) / total,
       }),
     );
-    send({ type: "result", id, ...result }, [result.bytes, ...result.previews]);
+    send({ type: "result", id, format: "pdf", ...result }, [
+      result.bytes,
+      ...result.previews,
+    ]);
   } catch (error) {
     send({
       type: "error",
@@ -101,7 +109,7 @@ self.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
       message:
         error instanceof Error
           ? error.message
-          : "Processing failed. No PDF was exported.",
+          : "Processing failed. No document was exported.",
     });
   } finally {
     busy = false;

@@ -16,7 +16,9 @@ test("live AI redacts a name without an explicit term", async ({ page }) => {
     mimeType: "application/pdf",
     buffer: Buffer.from(fixture()),
   });
-  await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
   // Stop promptly on application errors instead of waiting out the download timeout.
   const progress = setInterval(() => {
     void page
@@ -37,7 +39,7 @@ test("live AI redacts a name without an explicit term", async ({ page }) => {
     await page.locator(".file-list").innerText(),
   ).toBe(0);
   const downloadEvent = page.waitForEvent("download");
-  await page.getByRole("link", { name: "Download PDF" }).click();
+  await page.getByRole("link", { name: "Download document" }).click();
   const download = await downloadEvent;
   const data = await readFile((await download.path())!);
   const doc = new mupdf.PDFDocument(data);

@@ -19,10 +19,11 @@ browser memory using Web Workers, MuPDF WASM and Transformers.js. There is no
 processing backend, upload endpoint, account or analytics. Static HTTPS hosting
 is sufficient; Vite's relative base supports deployment under a subfolder.
 
-Supported today: searchable PDFs, multiple pages, batches, rules-only processing,
-optional AI detection, saved-output previews and permanent PDF redactions.
+Supported today: searchable PDFs, TXT files, multiple PDF pages, mixed batches,
+rules-only processing, optional AI detection and saved-output previews. PDF content
+is permanently redacted; TXT matches are replaced with `[REDACTED]`.
 Italian payslip rules still apply by default, including the 18% header and salary
-field protection. General profiles, TXT, Word, OCR, barcode detection, standalone
+field protection for PDFs. General profiles, Word, OCR, barcode detection, standalone
 images and manual redaction controls remain planned features.
 
 AI uses `openai/privacy-filter` with q4 weights, approximately 917 MB plus runtime
@@ -37,6 +38,7 @@ and can miss personal information. Do not promise complete anonymization.
 | ------------------------- | ------------------------------------------------------------------------------- |
 | `src/App.tsx`             | File queue, settings, worker lifecycle, cancellation, preview and download URLs |
 | `src/processor.worker.ts` | Lazy dependencies, GPU check, model loading, chunked inference and progress     |
+| `src/text.ts` | TXT decoding, span replacement and UTF-8 export |
 | `src/detection.ts`        | Byte-level token alignment and per-token model predictions                      |
 | `src/pdf.ts`              | PDF preflight, word coordinates, redaction, fresh output and saved-PDF previews |
 | `src/rules.ts`            | Explicit terms, payslip rules, keep precedence, rectangles and text chunking    |
@@ -45,7 +47,10 @@ and can miss personal information. Do not promise complete anonymization.
 
 Flow: file bytes → PDF preflight → extracted text/word coordinates → rules and
 optional AI spans → redaction rectangles → content removal → fresh PDF → preview
-of the saved artifact. AI input uses overlapping 3,000-character chunks with
+of the saved artifact. TXT instead decodes UTF-8 or BOM-marked UTF-16, uses the
+shared text rules and AI spans, then exports UTF-8. TXT never loads MuPDF and has
+no page/header/salary-layout rules. All AI categories are enabled; there is no
+category exclusion control. AI input uses overlapping 3,000-character chunks with
 400-character overlap. Text offsets are JavaScript UTF-16 indexes.
 
 ## Invariants and implementation traps
@@ -71,7 +76,8 @@ of the saved artifact. AI input uses overlapping 3,000-character chunks with
   barcode handling.
 - Preserve fresh-document export and metadata stripping. Original annotations,
   attachments and document-level extras are not copied. Password-protected PDFs,
-  interactive forms and pages with no searchable text currently stop processing.
+  interactive forms and PDF pages with no searchable text currently stop processing.
+  TXT decoding errors stop the affected file before inference; empty text is valid.
 - Explicitly destroy MuPDF objects/dispose tensors and release Blob URLs when no
   longer needed. Cancellation terminates the worker. Completed files currently
   need to be cleared and re-added to apply changed settings.

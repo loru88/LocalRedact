@@ -21,11 +21,13 @@ in the browser. Unchecked items are not implemented.
 
 ## TXT support
 
-- [ ] Accept `.txt` files and pasted text.
-- [ ] Reuse shared AI detection, explicit redact/keep terms and configurable rules.
+- [x] Accept `.txt` files, including mixed PDF/TXT batches.
+- [ ] Add pasted-text input.
+- [x] Reuse shared AI detection, explicit redact/keep terms and existing text rules.
 - [ ] Let users review, add and remove detections before export.
-- [ ] Replace approved sensitive text with `[REDACTED]` and export a fresh UTF-8
+- [x] Replace detected sensitive text with `[REDACTED]` and export a fresh UTF-8
       `.txt` file, preserving line breaks and handling Unicode and input encodings.
+      Input supports UTF-8 and BOM-marked UTF-16; unsupported encodings fail explicitly.
 
 ## General document mode and optional Italian payslip profile
 
