@@ -8,6 +8,9 @@ rules; general document profiles and additional formats are planned. Files are
 processed locally in a Web Worker with MuPDF WebAssembly and Transformers.js.
 There is no processing backend, upload endpoint, API key, analytics, or account.
 
+See [TODO.md](TODO.md) for the roadmap: TXT, optional document profiles, images,
+Word and expanded multi-page PDF support.
+
 ## Run
 
 Use Node.js 22.12+ (or a newer supported Node release).
