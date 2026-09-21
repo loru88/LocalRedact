@@ -1,0 +1,183 @@
+import {
+  type Options,
+  type PageText,
+  type Rect,
+  type Span,
+  type Word,
+} from "./types";
+
+const BANK =
+  /\b(?:IBAN|BANCA|BANCO|ISTITUTO\s+DI\s+CREDITO|ACCREDITO|COORDINATE\s+BANCARIE|BIC|SWIFT)\b/i;
+const ITALIAN_ID =
+  /\b(?:[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]|IT\d{2}[A-Z]\d{10}[A-Z0-9]{12})\b/gi;
+export const union = (a: Rect, b: Rect): Rect => [
+  Math.min(a[0], b[0]),
+  Math.min(a[1], b[1]),
+  Math.max(a[2], b[2]),
+  Math.max(a[3], b[3]),
+];
+export const intersects = (a: Rect, b: Rect) =>
+  a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+const overlaps = (w: Word, spans: Span[]) =>
+  spans.some(([s, e]) => w.start < e && w.end > s);
+const matches = (text: string, regex: RegExp): Span[] =>
+  [...text.matchAll(regex)]
+    .filter((m) => m[0].length > 0)
+    .map((m) => [m.index, m.index + m[0].length]);
+const escapeRegex = (text: string) =>
+  text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export function termSpans(text: string, terms: string[]): Span[] {
+  return terms.flatMap((term) =>
+    term.trim()
+      ? matches(text, new RegExp(escapeRegex(term.trim()), "giu"))
+      : [],
+  );
+}
+
+export function validateOptions(options: Options) {
+  if (
+    !Number.isFinite(options.headerFraction) ||
+    options.headerFraction < 0 ||
+    options.headerFraction > 1
+  )
+    throw new Error("Header percentage must be between 0 and 100.");
+  if (!/^[a-zA-Z0-9_-]+$/.test(options.prefix))
+    throw new Error(
+      "Filename prefix must contain only letters, numbers, hyphens or underscores.",
+    );
+  for (const pattern of options.keepRegexes) {
+    try {
+      new RegExp(pattern, "giu");
+    } catch {
+      throw new Error(`Invalid keep expression: ${pattern}`);
+    }
+  }
+}
+
+function fieldWords(page: PageText, pattern: RegExp): Set<number> {
+  const { text, words } = page;
+  let matching = words.filter((w) => pattern.test(text.slice(w.start, w.end)));
+  if (!matching.length) {
+    for (const line of new Set(words.map((w) => w.line))) {
+      const lineWords = words.filter((w) => w.line === line);
+      if (
+        pattern.test(
+          lineWords
+            .map((w) => text.slice(w.start, w.end))
+            .join("")
+            .replace(/\s/g, ""),
+        )
+      )
+        matching.push(...lineWords);
+    }
+  }
+  if (!matching.length) return new Set();
+  // Keep each label's nearby value independently. Joining distant PERIODO and
+  // RETRIBUZIONE labels into one box would accidentally protect the space between.
+  const areas = [...new Set(matching.map((w) => w.line))].map((line) => {
+    const area = matching
+      .filter((w) => w.line === line)
+      .map((w) => w.rect)
+      .reduce(union);
+    return [area[0] - 25, area[1] - 3, area[2] + 70, area[3] + 22] as Rect;
+  });
+  return new Set(
+    words.flatMap((w, i) =>
+      areas.some((area) => intersects(w.rect, area)) ? [i] : [],
+    ),
+  );
+}
+
+export function mergeRectangles(rectangles: Rect[]): Rect[] {
+  const sorted = [...rectangles].sort(
+    (a, b) => Math.round(a[1] * 10) - Math.round(b[1] * 10) || a[0] - b[0],
+  );
+  const merged: Rect[] = [];
+  for (const r of sorted) {
+    const padded: Rect = [r[0] - 1, r[1] - 1, r[2] + 1, r[3] + 1];
+    const previous = merged.at(-1);
+    if (
+      previous &&
+      Math.abs(previous[1] - padded[1]) < 2 &&
+      padded[0] - previous[2] < 5
+    )
+      merged[merged.length - 1] = union(previous, padded);
+    else merged.push(padded);
+  }
+  return merged;
+}
+
+export function redactionRects(
+  page: PageText,
+  bounds: Rect,
+  options: Options,
+  modelSpans: Span[],
+): Rect[] {
+  const { text, words, images } = page;
+  const keep = [
+    ...termSpans(text, options.keepTerms),
+    ...options.keepRegexes.flatMap((p) => matches(text, new RegExp(p, "giu"))),
+  ];
+  const protectedWords = new Set([
+    ...words.flatMap((w, i) => (overlaps(w, keep) ? [i] : [])),
+    ...fieldWords(page, /PERIODO|RETRIBUZIONE/i),
+    ...fieldWords(page, /NETTO(?:DEL)?MESE/i),
+  ]);
+  const mandatory = [
+    ...matches(text, ITALIAN_ID),
+    ...termSpans(text, options.redactTerms),
+  ];
+  const bankLines = new Set<number>();
+  for (const line of new Set(words.map((w) => w.line))) {
+    if (
+      BANK.test(
+        words
+          .filter((w) => w.line === line)
+          .map((w) => text.slice(w.start, w.end))
+          .join(" "),
+      )
+    )
+      bankLines.add(line);
+  }
+  const headerLimit =
+    bounds[1] + (bounds[3] - bounds[1]) * options.headerFraction;
+  const rects = words.flatMap((w, i) => {
+    const forced = overlaps(w, mandatory) || bankLines.has(w.line);
+    const optional =
+      overlaps(w, modelSpans) ||
+      (options.headerFraction > 0 && w.rect[1] < headerLimit);
+    return forced || (optional && !protectedWords.has(i)) ? [w.rect] : [];
+  });
+  if (options.headerFraction > 0)
+    rects.push(
+      ...images.filter((r) =>
+        intersects(r, [bounds[0], bounds[1], bounds[2], headerLimit]),
+      ),
+    );
+  return mergeRectangles(rects);
+}
+
+// Bound inference memory; overlap retains context at chunk boundaries. Offsets
+// are UTF-16 throughout (native JavaScript string indexes), including emoji.
+export function textChunks(
+  text: string,
+  size = 3000,
+  overlap = 400,
+): { text: string; offset: number }[] {
+  const chunks = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(start + size, text.length);
+    if (end < text.length) {
+      const space = text.lastIndexOf(" ", end);
+      if (space > start + size / 2) end = space;
+      if (/[\uD800-\uDBFF]/.test(text[end - 1])) end--;
+    }
+    chunks.push({ text: text.slice(start, end), offset: start });
+    if (end === text.length) break;
+    start = Math.max(start + 1, end - overlap);
+    if (/[\uDC00-\uDFFF]/.test(text[start])) start++;
+  }
+  return chunks;
+}

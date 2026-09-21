@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+test-results/
+playwright-report/
+.env
+.env.*
+.idea/
+.DS_Store
