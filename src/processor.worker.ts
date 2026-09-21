@@ -15,14 +15,14 @@ async function getClassifier(id: string) {
   ).gpu;
   if (!gpu || !(await gpu.requestAdapter())) {
     throw new Error(
-      "WebGPU is unavailable. AI detection needs a compatible browser and GPU on HTTPS or localhost. You can explicitly choose Rules only for reduced protection.",
+      "WebGPU is unavailable. AI detection requires a compatible browser and GPU on HTTPS or localhost. Select Rules only to process without AI detection.",
     );
   }
   send({
     type: "progress",
     id,
     message:
-      "Loading Privacy Filter. The first download is approximately 917 MB…",
+      "Loading OpenAI Privacy Filter. Model weights require approximately 917 MB plus runtime files on first use…",
   });
   const { pipeline, env } = await import("@huggingface/transformers");
   env.allowLocalModels = false;

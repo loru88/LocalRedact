@@ -162,7 +162,7 @@ export default function App() {
       instance.onerror = () => {
         pending.current?.reject(
           new Error(
-            "The processing worker stopped. Try a smaller PDF or restart processing.",
+            "PDF processing stopped unexpectedly. Retry processing or use a smaller PDF.",
           ),
         );
         pending.current = null;
@@ -300,25 +300,20 @@ export default function App() {
           LocalRedact<span className="brand-dot">.</span>
         </a>
         <span className="local-badge">
-          <span /> All processing stays on your device
+          <span /> Processed on your device
         </span>
       </header>
       <main>
         <section className="intro">
-          <div className="eyebrow">A LITTLE LESS PERSONAL</div>
-          <h1>
-            Your documents.
-            <br />
-            Without your private details.
-          </h1>
+          <div className="eyebrow">PDF REDACTION</div>
+          <h1>Redact sensitive PDF content</h1>
           <p>
-            Remove sensitive information from Italian payslips.
-            <br className="desktop-break" /> Select your PDFs, review the
-            result, and share with confidence.
+            Select PDFs with searchable text, configure redaction, and review
+            the output. The current rules are designed for Italian payslips.
           </p>
           <div className="intro-note">
-            <Icon kind="shield" size={16} /> No uploads. No account. Your
-            originals stay untouched.
+            <Icon kind="shield" size={16} /> Files are processed in your
+            browser. Original files are not modified.
           </div>
         </section>
 
@@ -328,7 +323,7 @@ export default function App() {
               <div className="section-heading">
                 <div>
                   <span className="step">01</span>
-                  <h2>Add your PDFs</h2>
+                  <h2>Add PDFs</h2>
                 </div>
                 <span className="muted">Searchable PDFs</span>
               </div>
@@ -350,13 +345,11 @@ export default function App() {
                 <span className="upload-icon">
                   <Icon kind="upload" size={25} />
                 </span>
-                <strong>Drop your PDFs here</strong>
+                <strong>Drop PDF files here</strong>
                 <span>
                   or <u>browse files</u> on your device
                 </span>
-                <small>
-                  Multiple files welcome · Files never leave this browser
-                </small>
+                <small>Select one or more PDFs. Files are not uploaded.</small>
               </button>
               <input
                 ref={input}
@@ -371,9 +364,9 @@ export default function App() {
               />
               {!jobs.length && (
                 <div className="sample-line">
-                  Just looking around?{" "}
+                  Example document:{" "}
                   <button className="text-button" onClick={sample}>
-                    Try a sample (rules only) <span aria-hidden="true">↗</span>
+                    Load sample (rules only) <span aria-hidden="true">↗</span>
                   </button>
                 </div>
               )}
@@ -512,8 +505,8 @@ export default function App() {
                   </div>
                   {chosen.mode === "rules" && (
                     <p className="notice">
-                      Rules-only result: names and addresses are covered only
-                      where your explicit terms or header rule matched.
+                      Rules-only result: text is removed where a payslip rule or
+                      an explicit term matches. Names and addresses may remain.
                     </p>
                   )}
                   <div className="preview-canvas">
@@ -539,9 +532,9 @@ export default function App() {
                     <i />
                     <span />
                   </div>
-                  <h3>A final look, before you share.</h3>
+                  <h3>No output to preview</h3>
                   <p>
-                    Your redacted document will appear here.
+                    Process a PDF to see the output here.
                     <br />
                     Review each page before downloading.
                   </p>
@@ -554,7 +547,7 @@ export default function App() {
             <div className="section-heading">
               <div>
                 <span className="step">02</span>
-                <h2>Set your protection</h2>
+                <h2>Redaction settings</h2>
               </div>
             </div>
             <fieldset disabled={running}>
@@ -578,12 +571,15 @@ export default function App() {
                     role="note"
                     aria-label="AI detection limitations"
                   >
-                    <strong>AI can miss personal details.</strong>
+                    <strong>
+                      Detection can miss or incorrectly select text.
+                    </strong>
                     <p>
-                      Privacy Filter may miss names and other sensitive text,
-                      especially in non-English documents or unfamiliar layouts.
-                      Fields such as sex, citizenship and birthplace may remain
-                      visible. It does not inspect images or barcode contents.
+                      OpenAI Privacy Filter may miss names and other sensitive
+                      text, especially in non-English documents or unfamiliar
+                      layouts. Fields such as sex, citizenship and birthplace
+                      may remain visible. It does not inspect images or barcode
+                      contents.
                     </p>
                     <p>
                       Review every page before sharing. Add missed text to
@@ -594,20 +590,29 @@ export default function App() {
                     </p>
                   </div>
                   <p className="help">
-                    Privacy Filter runs locally. The first use downloads about
-                    917 MB of model weights, cached when browser storage allows.
+                    Rules match known patterns and terms you enter. Privacy
+                    Filter also uses context to identify personal information,
+                    such as names and addresses, without an explicit term.
                   </p>
                   <p className="help">
-                    AI requires WebGPU: use a compatible browser and GPU on
-                    HTTPS or localhost. AI errors stop that file; protection is
-                    never silently reduced.
+                    AI mode uses OpenAI Privacy Filter. The first use downloads
+                    approximately 917 MB of model weights plus runtime files.
+                    Loading the model requires additional memory. Your browser
+                    may cache the files, but may need to download them again.
+                  </p>
+                  <p className="help">
+                    Processing runs locally; document contents are not sent to
+                    OpenAI. AI requires a browser and GPU with WebGPU support,
+                    using HTTPS or localhost. If AI processing fails, that file
+                    is not exported. Rules-only mode must be selected
+                    explicitly.
                   </p>
                 </>
               ) : (
                 <p className="notice">
-                  AI is off. Rules cover tax codes, IBANs, bank lines, the
-                  header and your explicit terms. Other names and addresses may
-                  remain.
+                  AI is off. Rules match Italian tax codes and IBANs, bank
+                  lines, the selected header area and terms you enter. Other
+                  personal information may remain.
                 </p>
               )}
               <div className="divider" />
@@ -637,7 +642,9 @@ export default function App() {
               <textarea
                 id="redact"
                 rows={3}
-                placeholder={"Employer name\nBank name\nAny other private text"}
+                placeholder={
+                  "Person or employer name\nBank name\nOther text to remove"
+                }
                 value={options.redactTerms.join("\n")}
                 onChange={(e) =>
                   update("redactTerms", e.target.value.split("\n"))
@@ -698,9 +705,10 @@ export default function App() {
                   <>
                     <span className="field-label">Skip AI categories</span>
                     <p className="help">
-                      Checked categories stay visible unless a payslip rule
-                      matches. Skipping dates also keeps birth and employment
-                      dates.
+                      AI detections in checked categories are ignored. Header
+                      rules, payslip rules and “Always redact” still apply.
+                      Skipping dates also excludes birth and employment dates
+                      from AI redaction.
                     </p>
                     <div className="checkbox-grid">
                       {CATEGORIES.map((category) => (
@@ -730,17 +738,18 @@ export default function App() {
             <div className="privacy-note">
               <Icon kind="shield" size={22} />
               <div>
-                <strong>Private from start to finish</strong>
+                <strong>File handling</strong>
                 <p>
-                  PDFs stay in browser memory. Downloads contain permanent
-                  redactions and cleared standard and XML metadata.
+                  PDFs are held in browser memory. Output files remove selected
+                  text and image pixels, and standard and XML metadata. Vector
+                  graphics are currently preserved.
                 </p>
               </div>
             </div>
           </aside>
         </div>
         <footer>
-          <span>Made for sharing less.</span>
+          <span>LocalRedact</span>
           <span>Scanned pages need OCR first · No document uploads</span>
         </footer>
       </main>

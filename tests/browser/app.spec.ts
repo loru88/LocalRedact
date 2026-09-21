@@ -10,9 +10,9 @@ test("processes and downloads PDFs entirely locally in the production build", as
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Your documents.",
+    "Redact sensitive PDF content",
   );
-  await page.getByRole("button", { name: /Try a sample/ }).click();
+  await page.getByRole("button", { name: /Load sample/ }).click();
   await expect(
     page.getByText("example-payslip.pdf", { exact: true }),
   ).toBeVisible();
@@ -77,7 +77,7 @@ test("shows a per-file OCR error and continues the batch", async ({ page }) => {
 
 test("validates configuration before starting", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: /Try a sample/ }).click();
+  await page.getByRole("button", { name: /Load sample/ }).click();
   await page.getByText("Advanced options", { exact: true }).click();
   await page.getByLabel("Keep expressions").fill("[");
   await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
@@ -94,7 +94,7 @@ test("AI download failure never falls back to rules-only export", async ({
     route.abort("failed"),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: /Try a sample/ }).click();
+  await page.getByRole("button", { name: /Load sample/ }).click();
   await page.getByLabel("Detection", { exact: true }).selectOption("model");
   await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
   await expect(page.locator(".file-error")).toBeVisible({ timeout: 30000 });
@@ -116,7 +116,7 @@ test("cancels model loading and can restart in the explicitly selected rules mod
     await route.abort().catch(() => {});
   });
   await page.goto("/");
-  await page.getByRole("button", { name: /Try a sample/ }).click();
+  await page.getByRole("button", { name: /Load sample/ }).click();
   await page.getByLabel("Detection", { exact: true }).selectOption("model");
   await page.getByRole("button", { name: "Redact PDF", exact: true }).click();
   await expect.poll(() => releases.length).toBeGreaterThan(0);

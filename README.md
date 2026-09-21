@@ -25,7 +25,7 @@ npm run dev
 ```
 
 Open the localhost URL printed by Vite. Select PDFs, configure protection, click
-**Redact PDF**, inspect every page, and download each output. **Try a sample** adds
+**Redact PDF**, inspect every page, and download each output. **Load sample** adds
 a synthetic document and selects rules-only mode, so you can try the PDF pipeline
 without downloading a model. The original Python project is maintained separately.
 
