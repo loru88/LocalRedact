@@ -106,3 +106,9 @@ precedence, Unicode alignment and error handling. For UI/worker changes, run the
 relevant browser tests. For documentation-only changes, formatting and
 `git diff --check` suffice. Format only touched files with Prettier;
 `npm run format` rewrites a broader set of project files.
+
+## Writing style
+
+Use plain english that goes straight to the point.
+It's a plain old open source project, there is no need to sell anything.
+Do not use marketing peach, tag line and any other salesy language.
