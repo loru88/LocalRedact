@@ -32,7 +32,7 @@ describe("TXT processing", () => {
       (
         await processText(
           bytes(source),
-          { ...rules, headerFraction: 1 },
+          { ...rules, redactHeader: true, headerFraction: 1 },
           noModel,
         )
       ).text,
@@ -55,13 +55,16 @@ describe("TXT processing", () => {
       bytes(source),
       {
         ...rules,
+        enabledRules: ["italianFiscalCode", "iban"],
         keepRegexes: ["[^\\r\\n]+"],
         keepTerms: ["Maria Rossi"],
         redactTerms: ["Maria Rossi"],
       },
       noModel,
     );
-    expect(result.text).toBe("[REDACTED]\r\n[REDACTED]\r\n[REDACTED]\r\nEnd");
+    expect(result.text).toBe(
+      "[REDACTED]\r\nIBAN [REDACTED]\r\n[REDACTED]\r\nEnd",
+    );
     expect(result.marks).toBe(3);
   });
 

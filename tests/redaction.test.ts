@@ -8,11 +8,39 @@ import { fixture } from "./fixture";
 const rules: Options = {
   ...DEFAULT_OPTIONS,
   mode: "rules",
+  enabledRules: ["italianFiscalCode", "iban"],
+  redactHeader: true,
   redactTerms: ["Mario Rossi"],
 };
 
 describe("saved PDF redaction", () => {
-  it("removes header images and renders permanent black rectangles", async () => {
+  it("leaves header text, banking lines and identifiers intact with flags off", async () => {
+    const result = await processPdf(
+      fixture(),
+      { ...DEFAULT_OPTIONS, mode: "rules" },
+      async () => [],
+      () => {},
+    );
+    const doc = new mupdf.PDFDocument(result.bytes);
+    const page = doc.loadPage(0);
+    try {
+      const text = extractPage(page).text;
+      for (const value of [
+        "ACME",
+        "BANCA ESEMPIO",
+        "RSSMRA80A01H501U",
+        "IT60X0542811101000000123456",
+        "GB82 WEST",
+      ])
+        expect(text).toContain(value);
+      expect(result.marks).toBe(0);
+    } finally {
+      page.destroy();
+      doc.destroy();
+    }
+  });
+
+  it("preserves header images while permanently removing header text", async () => {
     const input = fixture({ headerImage: true });
     const source = new mupdf.PDFDocument(input);
     const sourcePage = source.loadPage(0);
@@ -27,7 +55,8 @@ describe("saved PDF redaction", () => {
     );
     const output = new mupdf.PDFDocument(result.bytes);
     const page = output.loadPage(0);
-    expect(extractPage(page).images).toHaveLength(0);
+    expect(extractPage(page).images).toHaveLength(1);
+    expect(extractPage(page).text).not.toContain("ACME");
     const pixels = page.toPixmap(
       mupdf.Matrix.identity,
       mupdf.ColorSpace.DeviceRGB,
@@ -35,7 +64,9 @@ describe("saved PDF redaction", () => {
       false,
     );
     const index = 115 * pixels.getStride() + 65 * 3;
-    expect([...pixels.getPixels().slice(index, index + 3)]).toEqual([0, 0, 0]);
+    expect([...pixels.getPixels().slice(index, index + 3)]).toEqual([
+      180, 180, 180,
+    ]);
     pixels.destroy();
     page.destroy();
     output.destroy();
@@ -55,7 +86,7 @@ describe("saved PDF redaction", () => {
     output.destroy();
   });
 
-  it("removes underlying text, metadata and ancillary content while preserving pay fields", async () => {
+  it("removes underlying text, metadata and ancillary content while preserving explicit keep terms", async () => {
     const result = await processPdf(
       fixture(),
       {
@@ -87,12 +118,15 @@ describe("saved PDF redaction", () => {
       "Mario",
       "Rossi",
       "RSSMRA80A01H501U",
-      "BANCA",
-      "123456789",
       "IT60",
+      "GB82",
+      "WEST",
+      "7654",
     ])
       expect(text).not.toContain(sensitive);
     for (const preserved of [
+      "BANCA ESEMPIO",
+      "123456789",
       "Gennaio 2026",
       "NETTO DEL MESE",
       "1.950,00",
@@ -128,8 +162,8 @@ describe("saved PDF redaction", () => {
     const page = doc.loadPage(0);
     const text = extractPage(page).text;
     expect(text).toContain("Mario Rossi");
-    expect(text).toContain("Gennaio 2026");
-    expect(text).toContain("1.950,00");
+    expect(text).not.toContain("Gennaio 2026");
+    expect(text).not.toContain("1.950,00");
     expect(text).not.toContain("Via Esempio");
     page.destroy();
     doc.destroy();

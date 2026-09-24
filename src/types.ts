@@ -26,6 +26,8 @@ export interface PageText {
 }
 export interface Options {
   mode: "model" | "rules";
+  enabledRules: string[];
+  redactHeader: boolean;
   headerFraction: number;
   redactTerms: string[];
   keepTerms: string[];
@@ -34,6 +36,8 @@ export interface Options {
 }
 export const DEFAULT_OPTIONS: Options = {
   mode: "model",
+  enabledRules: [],
+  redactHeader: false,
   headerFraction: 0.18,
   redactTerms: [],
   keepTerms: [],

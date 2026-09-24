@@ -6,18 +6,14 @@ import {
   type Word,
 } from "./types";
 
-const BANK =
-  /\b(?:IBAN|BANCA|BANCO|ISTITUTO\s+DI\s+CREDITO|ACCREDITO|COORDINATE\s+BANCARIE|BIC|SWIFT)\b/i;
-const ITALIAN_ID =
-  /\b(?:[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]|IT\d{2}[A-Z]\d{10}[A-Z0-9]{12})\b/gi;
+import { IDENTIFIER_RULES } from "./identifierRules";
+
 export const union = (a: Rect, b: Rect): Rect => [
   Math.min(a[0], b[0]),
   Math.min(a[1], b[1]),
   Math.max(a[2], b[2]),
   Math.max(a[3], b[3]),
 ];
-export const intersects = (a: Rect, b: Rect) =>
-  a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
 const overlaps = (w: Word, spans: Span[]) =>
   spans.some(([s, e]) => w.start < e && w.end > s);
 const matches = (text: string, regex: RegExp): Span[] =>
@@ -42,16 +38,24 @@ export function textRuleSpans(text: string, options: Options) {
     ...options.keepRegexes.flatMap((p) => matches(text, new RegExp(p, "giu"))),
   ];
   const mandatory: Span[] = [
-    ...matches(text, ITALIAN_ID),
+    ...IDENTIFIER_RULES.filter((rule) =>
+      options.enabledRules.includes(rule.id),
+    ).flatMap((rule) => rule.detect(text)),
     ...termSpans(text, options.redactTerms),
-    ...Array.from(text.matchAll(/[^\r\n]+/g)).flatMap((line): Span[] =>
-      BANK.test(line[0]) ? [[line.index, line.index + line[0].length]] : [],
-    ),
   ];
   return { keep, mandatory };
 }
 
 export function validateOptions(options: Options) {
+  if (
+    !Array.isArray(options.enabledRules) ||
+    options.enabledRules.some(
+      (id) => !IDENTIFIER_RULES.some((rule) => rule.id === id),
+    )
+  )
+    throw new Error("Unknown identifier rule.");
+  if (typeof options.redactHeader !== "boolean")
+    throw new Error("Header redaction must be enabled or disabled.");
   if (
     !Number.isFinite(options.headerFraction) ||
     options.headerFraction < 0 ||
@@ -69,40 +73,6 @@ export function validateOptions(options: Options) {
       throw new Error(`Invalid keep expression: ${pattern}`);
     }
   }
-}
-
-function fieldWords(page: PageText, pattern: RegExp): Set<number> {
-  const { text, words } = page;
-  let matching = words.filter((w) => pattern.test(text.slice(w.start, w.end)));
-  if (!matching.length) {
-    for (const line of new Set(words.map((w) => w.line))) {
-      const lineWords = words.filter((w) => w.line === line);
-      if (
-        pattern.test(
-          lineWords
-            .map((w) => text.slice(w.start, w.end))
-            .join("")
-            .replace(/\s/g, ""),
-        )
-      )
-        matching.push(...lineWords);
-    }
-  }
-  if (!matching.length) return new Set();
-  // Keep each label's nearby value independently. Joining distant PERIODO and
-  // RETRIBUZIONE labels into one box would accidentally protect the space between.
-  const areas = [...new Set(matching.map((w) => w.line))].map((line) => {
-    const area = matching
-      .filter((w) => w.line === line)
-      .map((w) => w.rect)
-      .reduce(union);
-    return [area[0] - 25, area[1] - 3, area[2] + 70, area[3] + 22] as Rect;
-  });
-  return new Set(
-    words.flatMap((w, i) =>
-      areas.some((area) => intersects(w.rect, area)) ? [i] : [],
-    ),
-  );
 }
 
 export function mergeRectangles(rectangles: Rect[]): Rect[] {
@@ -130,12 +100,10 @@ export function redactionRects(
   options: Options,
   modelSpans: Span[],
 ): Rect[] {
-  const { text, words, images } = page;
+  const { text, words } = page;
   const { keep, mandatory } = textRuleSpans(text, options);
   const protectedWords = new Set([
     ...words.flatMap((w, i) => (overlaps(w, keep) ? [i] : [])),
-    ...fieldWords(page, /PERIODO|RETRIBUZIONE/i),
-    ...fieldWords(page, /NETTO(?:DEL)?MESE/i),
   ]);
   const headerLimit =
     bounds[1] + (bounds[3] - bounds[1]) * options.headerFraction;
@@ -143,15 +111,11 @@ export function redactionRects(
     const forced = overlaps(w, mandatory);
     const optional =
       overlaps(w, modelSpans) ||
-      (options.headerFraction > 0 && w.rect[1] < headerLimit);
+      (options.redactHeader &&
+        options.headerFraction > 0 &&
+        w.rect[1] < headerLimit);
     return forced || (optional && !protectedWords.has(i)) ? [w.rect] : [];
   });
-  if (options.headerFraction > 0)
-    rects.push(
-      ...images.filter((r) =>
-        intersects(r, [bounds[0], bounds[1], bounds[2], headerLimit]),
-      ),
-    );
   return mergeRectangles(rects);
 }
 
