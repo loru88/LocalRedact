@@ -17,6 +17,7 @@ export function fixture({
     [45, 265, "Codice fiscale: RSSMRA80A01H501U"],
     [45, 320, "BANCA ESEMPIO - Conto 123456789"],
     [45, 350, "IBAN IT60X0542811101000000123456"],
+    [45, 380, "IBAN GB82 WEST 1234 5698 7654 32"],
     [45, 430, "Retribuzione ordinaria 2.500,00"],
     [400, 690, "NETTO DEL MESE"],
     [400, 708, "1.950,00"],

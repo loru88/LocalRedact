@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import * as mupdf from "mupdf";
+import { extractPage } from "../../src/pdf";
 import { test, expect } from "@playwright/test";
 import { fixture } from "../fixture";
 
@@ -146,4 +149,30 @@ test("cancels model loading and can restart in the explicitly selected rules mod
   await expect(
     page.getByRole("link", { name: "Download document" }),
   ).toBeVisible();
+});
+
+test("PDF header text flag controls the saved output", async ({ page }) => {
+  await page.goto("/");
+  for (const enabled of [false, true]) {
+    await page.getByRole("button", { name: /Load sample/ }).click();
+    await page
+      .getByLabel("Redact PDF header text", { exact: true })
+      .setChecked(enabled);
+    await page
+      .getByRole("button", { name: "Redact document", exact: true })
+      .click();
+    const download = page.waitForEvent("download");
+    await page.getByRole("link", { name: "Download document" }).click();
+    const doc = new mupdf.PDFDocument(
+      await readFile((await (await download).path())!),
+    );
+    const pdfPage = doc.loadPage(0);
+    try {
+      expect(extractPage(pdfPage).text.includes("ACME")).toBe(!enabled);
+    } finally {
+      pdfPage.destroy();
+      doc.destroy();
+    }
+    await page.getByRole("button", { name: "Clear files" }).click();
+  }
 });

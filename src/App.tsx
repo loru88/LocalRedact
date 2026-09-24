@@ -7,6 +7,7 @@ import {
   type WorkerResponse,
 } from "./types";
 import { validateOptions } from "./rules";
+import { IDENTIFIER_RULES } from "./identifierRules";
 
 type Result = Extract<WorkerResponse, { type: "result" }>;
 type Job = {
@@ -316,8 +317,8 @@ export default function App() {
           <h1>Redact sensitive document content</h1>
           <p>
             Select PDF or TXT documents, configure redaction, and review the
-            output. PDFs must contain searchable text. Italian payslip text
-            rules currently apply to both formats.
+            output. PDFs must contain searchable text. Optional identifier rules
+            apply to both formats.
           </p>
         </section>
 
@@ -449,8 +450,8 @@ export default function App() {
               <div className="action-row">
                 <span>
                   {options.mode === "model"
-                    ? "AI detection + payslip rules"
-                    : "Payslip rules only · AI is off"}
+                    ? "AI detection + selected rules"
+                    : "Selected rules only · AI is off"}
                 </span>
                 {running ? (
                   <button className="secondary-button" onClick={cancel}>
@@ -514,8 +515,9 @@ export default function App() {
                   </div>
                   {chosen.mode === "rules" && (
                     <p className="notice">
-                      Rules-only result: text is removed where a payslip rule or
-                      an explicit term matches. Names and addresses may remain.
+                      Rules-only result: text is removed where an enabled rule
+                      or an explicit term matches. Names and addresses may
+                      remain.
                     </p>
                   )}
                   {chosen.previews ? (
@@ -535,8 +537,8 @@ export default function App() {
                   )}
                   <p className="review-note">
                     Review the entire document before sharing. Automatic
-                    detection can miss personal details, especially in Italian
-                    text. This preview shows the saved document.
+                    detection can miss personal details, especially in
+                    non-English text. This preview shows the saved document.
                   </p>
                 </>
               ) : (
@@ -579,7 +581,7 @@ export default function App() {
                   update("mode", e.target.value as Options["mode"])
                 }
               >
-                <option value="model">AI + payslip rules</option>
+                <option value="model">AI + selected rules</option>
                 <option value="rules">Rules only (no model download)</option>
               </select>
               {options.mode === "model" ? (
@@ -628,20 +630,51 @@ export default function App() {
                 </>
               ) : (
                 <p className="notice">
-                  AI is off. Rules match Italian tax codes and IBANs, bank
-                  lines, the selected header area and terms you enter. Other
-                  personal information may remain.
+                  AI is off. Only enabled rules, the optional PDF header area
+                  and terms you enter are redacted. Other personal information
+                  may remain.
                 </p>
               )}
               <div className="divider" />
+              {IDENTIFIER_RULES.map((rule) => (
+                <div key={rule.id}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={options.enabledRules.includes(rule.id)}
+                      onChange={(e) =>
+                        update(
+                          "enabledRules",
+                          e.target.checked
+                            ? [...options.enabledRules, rule.id]
+                            : options.enabledRules.filter(
+                                (id) => id !== rule.id,
+                              ),
+                        )
+                      }
+                    />{" "}
+                    {rule.label}
+                  </label>
+                  <p className="help">{rule.description}</p>
+                </div>
+              ))}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={options.redactHeader}
+                  onChange={(e) => update("redactHeader", e.target.checked)}
+                />{" "}
+                Redact PDF header text
+              </label>
               <div className="range-heading">
                 <label className="field-label" htmlFor="header">
-                  Employer header (PDF only)
+                  Header size (PDF only)
                 </label>
                 <span>{Math.round(options.headerFraction * 100)}%</span>
               </div>
               <input
                 id="header"
+                disabled={!options.redactHeader}
                 type="range"
                 min="0"
                 max="100"
@@ -651,9 +684,9 @@ export default function App() {
                 }
               />
               <p className="help">
-                PDF only: remove words in the top portion of each page and
-                images crossing it. Recognized pay-period and net-pay fields are
-                preserved. These layout rules do not apply to TXT documents.
+                Remove text in the top portion of each PDF page. Images are not
+                selected. Image pixels underneath redacted text may still be
+                removed. This setting does not apply to TXT documents.
               </p>
               <label className="field-label" htmlFor="redact">
                 Always redact
@@ -678,15 +711,15 @@ export default function App() {
               <textarea
                 id="keep"
                 rows={2}
-                placeholder={"Gennaio 2026\nText you want to preserve"}
+                placeholder={"January 2026\nText you want to preserve"}
                 value={options.keepTerms.join("\n")}
                 onChange={(e) =>
                   update("keepTerms", e.target.value.split("\n"))
                 }
               />
               <p className="help">
-                Overrides AI and header matches. Tax codes, IBANs, bank lines
-                and “Always redact” still take priority.
+                Overrides AI and header matches. Enabled identifier rules and
+                “Always redact” still take priority.
               </p>
               <details>
                 <summary>Advanced options</summary>

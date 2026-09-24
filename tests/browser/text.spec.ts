@@ -121,13 +121,11 @@ test("TXT model download failure does not export a rules-only result", async ({
   await expect(
     page.getByText("Skip AI categories", { exact: true }),
   ).toHaveCount(0);
-  await page
-    .locator("input[type=file]")
-    .setInputFiles({
-      name: "notes.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from("Maria Rossi lives in Rome."),
-    });
+  await page.locator("input[type=file]").setInputFiles({
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Maria Rossi lives in Rome."),
+  });
   await page
     .getByRole("button", { name: "Redact document", exact: true })
     .click();
@@ -137,5 +135,36 @@ test("TXT model download failure does not export a rules-only result", async ({
   ).toHaveCount(0);
   await expect(page.getByLabel("Detection", { exact: true })).toHaveValue(
     "model",
+  );
+});
+
+test("identifier flags independently control TXT processing", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Detection", { exact: true }).selectOption("rules");
+  await expect(
+    page.getByLabel("Italian fiscal codes", { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByLabel("IBAN bank accounts", { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByLabel("Redact PDF header text", { exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByLabel("Header size (PDF only)", { exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("IBAN bank accounts", { exact: true }).check();
+  await page.locator("input[type=file]").setInputFiles({
+    name: "accounts.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("BANCA GB82 WEST 1234 5698 7654 32\nRSSMRA80A01H501U"),
+  });
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
+  await expect(page.getByLabel("Redacted text document")).toHaveText(
+    "BANCA [REDACTED]\nRSSMRA80A01H501U",
   );
 });

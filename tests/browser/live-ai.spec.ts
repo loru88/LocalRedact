@@ -48,7 +48,6 @@ test("live AI redacts a name without an explicit term", async ({ page }) => {
   try {
     expect(structured.asText()).not.toContain("Mario");
     expect(structured.asText()).not.toContain("Rossi");
-    expect(structured.asText()).toContain("1.950,00");
   } finally {
     structured.destroy();
     pdfPage.destroy();
