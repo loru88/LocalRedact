@@ -29,20 +29,15 @@ in the browser. Unchecked items are not implemented.
       `.txt` file, preserving line breaks and handling Unicode and input encodings.
       Input supports UTF-8 and BOM-marked UTF-16; unsupported encodings fail explicitly.
 
-## General document mode and optional Italian payslip profile
+## Optional detection rules
 
-- [ ] Extract Italian payslip behavior from the shared detection/redaction code
-      into an optional profile that enables its specific rules and options.
-- [ ] Make General document the default profile: no automatic header removal,
-      salary-field protection or Italian banking-line rules.
-- [ ] Keep an Italian payslip profile that enables the employer-header setting
-      (18% initially), fiscal-code/Italian IBAN patterns, banking-line redaction,
-      and pay-period/net-pay field protection.
-- [ ] Show the active profile and its enabled options; preserve explicit
-      redact/keep precedence and allow users to configure the profile.
-- [ ] Separate format-independent detection from PDF coordinates and export;
-      make worker messages, previews, MIME types and filenames format-aware.
-- [ ] Add regression coverage for both profiles and mixed-format batches.
+- [x] Make processing general-purpose by default, with no automatic header removal,
+      salary-field protection or banking-line rules.
+- [x] Add independent opt-in flags for Italian fiscal codes, international IBANs
+      and PDF header text, with shared redact/keep precedence.
+- [x] Use an extensible identifier-rule registry shared by PDF, TXT and the UI.
+- [x] Add regression coverage for flags, international IBANs and header images.
+- [ ] Show the exact enabled rules used for each completed result.
 
 ## Image support, OCR, barcodes and QR codes
 

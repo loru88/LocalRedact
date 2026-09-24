@@ -22,9 +22,10 @@ is sufficient; Vite's relative base supports deployment under a subfolder.
 Supported today: searchable PDFs, TXT files, multiple PDF pages, mixed batches,
 rules-only processing, optional AI detection and saved-output previews. PDF content
 is permanently redacted; TXT matches are replaced with `[REDACTED]`.
-Italian payslip rules still apply by default, including the 18% header and salary
-field protection for PDFs. General profiles, Word, OCR, barcode detection, standalone
-images and manual redaction controls remain planned features.
+Identifier rules (Italian fiscal codes and international IBANs) and PDF header
+text removal are independent flags, off by default. No banking-line rules or
+salary-field protection apply. Word, OCR, barcode detection, standalone images
+and manual redaction controls remain planned features.
 
 AI uses `openai/privacy-filter` with q4 weights, approximately 917 MB plus runtime
 and tokenizer assets. In the tested implementation it requires WebGPU; the
@@ -38,10 +39,11 @@ and can miss personal information. Do not promise complete anonymization.
 | ------------------------- | ------------------------------------------------------------------------------- |
 | `src/App.tsx`             | File queue, settings, worker lifecycle, cancellation, preview and download URLs |
 | `src/processor.worker.ts` | Lazy dependencies, GPU check, model loading, chunked inference and progress     |
-| `src/text.ts` | TXT decoding, span replacement and UTF-8 export |
+| `src/text.ts`             | TXT decoding, span replacement and UTF-8 export                                 |
 | `src/detection.ts`        | Byte-level token alignment and per-token model predictions                      |
 | `src/pdf.ts`              | PDF preflight, word coordinates, redaction, fresh output and saved-PDF previews |
-| `src/rules.ts`            | Explicit terms, payslip rules, keep precedence, rectangles and text chunking    |
+| `src/rules.ts`            | Explicit terms, enabled rules, keep precedence, rectangles and text chunking    |
+| `src/identifierRules.ts`  | Extensible optional identifier detectors and their UI labels                    |
 | `src/types.ts`            | Options/defaults, categories, spans, rectangles and worker messages             |
 | `tests/`                  | Synthetic PDF fixtures, unit/integration tests and Playwright browser tests     |
 
@@ -49,7 +51,7 @@ Flow: file bytes → PDF preflight → extracted text/word coordinates → rules
 optional AI spans → redaction rectangles → content removal → fresh PDF → preview
 of the saved artifact. TXT instead decodes UTF-8 or BOM-marked UTF-16, uses the
 shared text rules and AI spans, then exports UTF-8. TXT never loads MuPDF and has
-no page/header/salary-layout rules. All AI categories are enabled; there is no
+no page/header layout rules. All AI categories are enabled; there is no
 category exclusion control. AI input uses overlapping 3,000-character chunks with
 400-character overlap. Text offsets are JavaScript UTF-16 indexes.
 
@@ -66,10 +68,10 @@ category exclusion control. AI input uses overlapping 3,000-character chunks wit
   other files in the batch from completing.
 - Register the worker message handler before asynchronous MuPDF initialization.
   A static import previously caused the first processing message to be lost.
-- Explicit redact terms, tax codes, IBANs and bank lines override keep rules.
-  Keep terms/regexes and salary-field protection can override AI/header matches.
-  Keep each salary-field protection area separate; merging distant labels can
-  accidentally protect unrelated sensitive text.
+- Explicit redact terms and enabled identifier rules override keep rules.
+  Keep terms/regexes override AI/header text matches. Header removal selects
+  text only, not image bounds; overlapping image pixels can still be removed
+  by MuPDF text redaction rectangles.
 - Redactions must remove underlying content, not merely draw overlays. Current
   MuPDF settings remove covered text/image pixels but preserve vector line art
   (`REDACT_LINE_ART_NONE`). Account for that limitation when changing image or

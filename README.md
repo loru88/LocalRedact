@@ -1,12 +1,11 @@
 # LocalRedact
 
-LocalRedact is a React + TypeScript + Vite app derived from an Italian payslip
-redactor. It supports searchable PDFs and TXT documents and still applies payslip-specific
-rules; general document profiles and additional formats are planned. Files are
+LocalRedact is a React + TypeScript + Vite app for searchable PDFs and TXT documents.
+It combines optional AI detection, explicit terms and independently enabled rules. Files are
 processed locally in a Web Worker with MuPDF WebAssembly and Transformers.js.
 There is no processing backend, upload endpoint, API key, analytics, or account.
 
-See [TODO.md](TODO.md) for the roadmap: text review controls, document profiles, images,
+See [TODO.md](TODO.md) for the roadmap: text review controls, images,
 Word and expanded multi-page PDF support.
 
 This README is the shared guide for humans and agents. [AGENTS.md](AGENTS.md)
@@ -38,7 +37,7 @@ need HTTP(S). No server-side application runtime is required.
 
 ## Detection modes
 
-- **AI + payslip rules** (default): downloads `openai/privacy-filter` in q4 format
+- **AI + selected rules** (default): downloads `openai/privacy-filter` in q4 format
   on first use, approximately 917 MB of model weights plus tokenizer/runtime
   assets. Requests retrieve public assets from Hugging Face and its CDN and the
   ONNX runtime CDN; document contents are never included. Browser caching is best-effort
@@ -49,7 +48,7 @@ need HTTP(S). No server-side application runtime is required.
   implement. The app checks for a GPU adapter before downloading model weights.
 - **Rules only**: no model download, and no automatic general-purpose detection
   of names, addresses, emails, dates, etc. Those details are removed only if a
-  header, explicit term, or another payslip rule covers them. This mode is always
+  enabled rule, optional PDF header, or explicit term covers them. This mode is always
   labelled in results. A model failure never silently switches to rules-only.
 
 Documents and generated results are held in memory. **Clear files** revokes result URLs;
@@ -68,9 +67,8 @@ served and model assets must be downloaded/cached. There is no service worker.
 - Input supports UTF-8 (with or without a BOM) and BOM-marked UTF-16 LE/BE. Invalid
   encodings and NUL-containing input stop that file before AI inference; save such
   files as UTF-8 text first. Output is always UTF-8 without a BOM.
-- AI detection, explicit terms, keep expressions and existing Italian tax-code,
-  IBAN and banking-line rules also apply to TXT. Header removal and automatic
-  salary-field protection are PDF-only; the header slider does not affect TXT.
+- AI detection, explicit terms, keep expressions and enabled identifier rules
+  apply to TXT. The optional PDF header setting does not affect TXT.
 - Matched text is replaced with `[REDACTED]`. Line endings, blank lines and
   surrounding whitespace are preserved. Overlapping detections are merged.
   Keep terms/expressions preserve matching character ranges from AI redaction;
@@ -84,11 +82,28 @@ served and model assets must be downloaded/cached. There is no service worker.
 
 ## Rules and PDF handling
 
-- Italian tax-code and IBAN patterns, bank-information lines, explicit redaction
-  terms, and a configurable employer header (18% by default).
-- Exact keep terms, JavaScript keep regexes, and automatic
-  protection of recognized pay-period and net-pay fields.
-- Explicit redact terms, tax codes, IBANs and bank lines override keep rules.
+- Identifier rules and PDF header removal are independently enabled and **off by
+  default**, in both detection modes. There are no automatic banking-line rules
+  or salary-field exceptions.
+- **Italian fiscal codes**: matches the 16-character personal fiscal-code pattern,
+  without checksum validation. This optional matcher is isolated from the shared
+  processing code.
+- **IBAN bank accounts**: matches compact or space-separated international IBANs
+  (case-insensitively, including nonbreaking spaces) using a modulo-97 checksum.
+  Country-specific lengths and account existence are not validated. Invalid
+  checksums and IBANs split across lines are not matched; use explicit terms for
+  these cases. Only the matched number is selected, not the surrounding bank line.
+  National formats are documented in the [SWIFT IBAN registry](https://www.swift.com/standards/data-standards/iban-international-bank-account-number).
+- **Redact PDF header text**: selects words in the top portion of every page;
+  the adjustable size starts at 18% when enabled. Images are not selected by this
+  rule. Image pixels underneath text redaction rectangles may still be removed.
+- Exact keep terms and JavaScript keep regexes override AI/header text matches.
+  Explicit redact terms and enabled identifier rules override keep rules.
+- To add an identifier flag, add an entry to `src/identifierRules.ts` with a stable
+  ID, label, description and detector returning UTF-16 spans. The UI and both
+  document processors use that registry. `Options.enabledRules` selects its IDs;
+  `Options.redactHeader` separately enables PDF header text removal. Unknown rule
+  IDs are rejected.
 - Word coordinates are extracted from MuPDF character quads. A one-point margin
   is added and neighboring rectangles on the same line are joined.
 - Redactions remove covered text and image pixels rather than drawing a reversible
@@ -103,31 +118,22 @@ served and model assets must be downloaded/cached. There is no service worker.
   first. Password-protected PDFs must be decrypted locally first. No OCR or
   password-entry feature is included.
 
-## Differences from the Python CLI
+## Detection details
 
-The browser implements the same rule priorities, with these deliberate differences:
+Per-token model scores are mapped through the tokenizer's reversible byte
+representation to the original text. The complete byte stream and token IDs must
+match before inference. Repeated terms retain their own positions, and tokens
+splitting an accented character or emoji cover the entire source character.
+An inconsistent token stream stops export.
 
-1. The browser reads per-token model scores directly and maps the tokenizer's
-   reversible byte representation to the original PDF text. The full byte stream
-   and token IDs must match before inference. This avoids decoded-string search,
-   punctuation cleanup, and grouping across unlabelled text. Repeated terms keep
-   their own positions; tokens splitting an accented character or emoji cover the
-   entire source character. An inconsistent token stream still stops export.
-   Explicit user keep rules still apply. This is not guaranteed to produce
-   identical model output to Python.
-2. Inference uses overlapping 3,000-character chunks (400-character overlap) to
-   bound working memory. Chunk boundaries and q4 quantization may change detections.
-3. Each pay-field label gets its own nearby protection area. The original Python
-   script joins distant matching labels, potentially protecting unrelated text
-   between them. The browser intentionally avoids that behavior.
-4. Keep regexes use JavaScript `giu` flags, not Python regex syntax. Case-insensitive
-   matching does not implement Python's full Unicode `casefold()` semantics.
-5. Textless pages fail the file rather than being passed through with a warning.
+Inference uses overlapping 3,000-character chunks (400-character overlap) to bound
+working memory. Chunk boundaries and q4 quantization may affect detections.
+Keep regexes use JavaScript `giu` flags, not Python regex syntax.
 
 Always inspect every output before sharing. Privacy Filter is primarily trained
-for English; Italian payslips can produce missed detections or false positives.
-Images elsewhere on a searchable page are not OCRed, and unusual PDF layouts can
-affect reading order and field protection. This tool does not guarantee anonymity.
+for English; non-English documents can produce missed detections or false positives.
+Images on searchable pages are not OCRed, and unusual PDF layouts can affect
+reading order. This tool does not guarantee anonymity.
 
 ## Potential feature: scan image text, barcodes and QR codes
 
@@ -155,7 +161,7 @@ and the existing MuPDF pipeline for permanent redaction.
    codes. The proposed default when scanning is enabled is to redact every detected
    code, regardless of whether its decoded value looks sensitive. Associate nearby
    printed digits using OCR, position and decoded content when available, then
-   include those digits in the redaction. Do not depend on the employer-header
+   include those digits in the redaction. Do not depend on the PDF header
    setting to cover codes elsewhere on the page.
 5. **Apply permanent redactions with MuPDF.** Merge detection rectangles and remove
    covered text, image pixels and vector barcode graphics. Audit the line-art
@@ -185,7 +191,7 @@ and the existing MuPDF pipeline for permanent redaction.
   accents, rotated/cropped pages, and small or low-quality text. Verify coordinate
   mapping, duplicate suppression and existing keep/redact priorities.
 - Cover raster and vector barcodes, QR codes, and printed digits beside codes,
-  including a visa-like fixture with employer-header redaction disabled.
+  including a visa-like fixture with PDF header redaction disabled.
 - Reopen exported PDFs and inspect text, rendered pages and embedded images to
   confirm the targeted content was removed. Check that covered codes no longer
   decode; a decoder failure alone is not proof of permanent removal.
@@ -229,7 +235,8 @@ PAYSLIP_LIVE_AI=1 PAYSLIP_NATIVE_GPU=1 npm run test:browser -- --grep 'live AI'
 - `src/pdf.ts`: text/coordinate extraction, permanent redaction and PDF export.
 - `src/text.ts`: TXT decoding, span replacement and UTF-8 text export.
 - `src/detection.ts`: byte-accurate token alignment and per-token AI detections.
-- `src/rules.ts`: precedence, keep fields and rectangle merging.
+- `src/rules.ts`: shared precedence, optional header text and rectangle merging.
+- `src/identifierRules.ts`: registry of optional identifier detectors and UI labels.
 - `tests/`: synthetic fixtures, integration tests and browser smoke tests.
 
 Dependencies: [MuPDF.js](https://github.com/ArtifexSoftware/mupdf.js),
