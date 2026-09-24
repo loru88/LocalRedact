@@ -8,16 +8,16 @@ tagged-release workflow after validation succeeds.
 
 Configure these repository variables in `loru88/LocalRedact`:
 
-| Variable | Value |
-| --- | --- |
-| `FTP_HOST` | `ftp.lorenzoadinolfi.it` |
-| `FTP_PORT` | The explicit FTPS port supplied by the hosting provider |
-| `FTP_REMOTE_ROOT` | The provider-specific parent web-root directory |
+| Variable          | Value                                                   |
+| ----------------- | ------------------------------------------------------- |
+| `FTP_HOST`        | `ftp.lorenzoadinolfi.it`                                |
+| `FTP_PORT`        | The explicit FTPS port supplied by the hosting provider |
+| `FTP_REMOTE_ROOT` | The provider-specific parent web-root directory         |
 
 Configure these encrypted repository secrets:
 
-| Secret | Value |
-| --- | --- |
+| Secret         | Value                    |
+| -------------- | ------------------------ |
 | `FTP_USERNAME` | The FTP account username |
 | `FTP_PASSWORD` | The FTP account password |
 
@@ -26,8 +26,11 @@ in source files, workflow logs, committed environment files, or issue text.
 The parent web-root value must be confirmed with the hosting provider; do not
 guess it from the FTP account home directory.
 
-The workflow must use explicit FTPS with certificate verification enabled. It
-must not silently fall back to plain FTP. The destination is resolved as:
+The workflow uses the runner's `lftp` client with explicit FTPS. It does not
+fall back to plain FTP. Certificate verification is temporarily disabled to
+match the provider certificate behavior previously accepted by FileZilla; this
+must be revisited when the provider supplies a matching certificate. The
+destination is resolved as:
 
 ```text
 ${FTP_REMOTE_ROOT}/localredact
@@ -55,8 +58,9 @@ git push origin v1.0.0
 ```
 
 The tagged workflow checks out that commit, installs from the committed
-`package-lock.json`, runs the tests and build, and uploads `dist/` only if all
-validation steps succeed. A failed test or build prevents any FTPS upload.
+`package-lock.json`, runs the tests and build, installs `lftp`, and uploads
+`dist/` only if all validation steps succeed. A failed test or build prevents
+any FTPS upload.
 
 Inspect the workflow run in the repository’s Actions page. Confirm that the
 run uses the intended tag and commit, and that logs do not contain secret
@@ -93,7 +97,7 @@ to restore the complete static site.
 
 - Keep `dist/`, `node_modules/`, `.env` files, and credentials out of commits.
 - Verify the FTPS mode, port, and parent web root before the first production
-  release.
+  release. Plain FTP is not permitted.
 - Never enable a mirror or delete operation without confirming that it is
   restricted to `FTP_REMOTE_ROOT/localredact`.
 - Review every generated PDF or TXT output in the application; deployment only

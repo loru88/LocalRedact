@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,8 +14,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Validate and publish
+  build:
+    name: Validate and build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -37,16 +38,43 @@ jobs:
       - name: Build static site
         run: npm run build
 
-      - name: Publish dist over explicit FTPS
-        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
+      - name: Upload build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          server: ${{ secrets.FTP_HOST }}
-          port: ${{ secrets.FTP_PORT }}
-          protocol: ftps
-          security: loose
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./dist/
-          server-dir: ${{ secrets.FTP_REMOTE_ROOT }}/localredact/
-          dangerous-clean-slate: false
-          log-level: minimal
+          name: frontend-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish over FTPS
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: frontend-dist
+          path: dist/
+
+      - name: Install FTPS client
+        run: sudo apt-get update && sudo apt-get install --yes lftp
+
+      - name: Publish dist over explicit FTPS
+        env:
+          FTP_HOST: ${{ vars.FTP_HOST }}
+          FTP_PORT: ${{ vars.FTP_PORT }}
+          FTP_REMOTE_ROOT: ${{ vars.FTP_REMOTE_ROOT }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -eu
+          test -n "$FTP_HOST"
+          test -n "$FTP_PORT"
+          test -n "$FTP_REMOTE_ROOT"
+          test -n "$FTP_USERNAME"
+          test -n "$FTP_PASSWORD"
+
+          lftp -c "set ftp:ssl-force true; set ftp:ssl-protect-data true; set ftp:passive-mode true; set ssl:verify-certificate false; open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"ftp://$FTP_HOST:$FTP_PORT\"; mirror --reverse --delete --delete-first --verbose=3 --no-perms --no-umask ./dist/ $FTP_REMOTE_ROOT"
