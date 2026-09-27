@@ -125,7 +125,7 @@ export default function App() {
     const accepted = files.filter((f) => /\.(pdf|txt)$/i.test(f.name));
     setError(
       accepted.length !== files.length
-        ? "Only PDF and TXT documents can be added."
+        ? "Only PDF and text documents can be added."
         : "",
     );
     setJobs((old) => [
@@ -316,7 +316,7 @@ export default function App() {
           <div className="eyebrow">DOCUMENT REDACTION</div>
           <h1>Redact sensitive document content</h1>
           <p>
-            Select PDF or TXT documents, configure redaction, and review the
+            Select PDF or text documents, configure redaction, and review the
             output. PDFs must contain searchable text. Optional identifier rules
             apply to both formats.
           </p>
@@ -330,7 +330,7 @@ export default function App() {
                   <span className="step">01</span>
                   <h2>Add documents</h2>
                 </div>
-                <span className="muted">PDF or TXT</span>
+                <span className="muted">PDF or text</span>
               </div>
               <button
                 className={`dropzone ${dragging ? "dragging" : ""}`}
@@ -355,7 +355,7 @@ export default function App() {
                   or <u>browse files</u> on your device
                 </span>
                 <small>
-                  Select one or more PDF or TXT documents. Files are not
+                  Select one or more PDF or text documents. Files are not
                   uploaded.
                 </small>
               </button>
@@ -686,7 +686,7 @@ export default function App() {
               <p className="help">
                 Remove text in the top portion of each PDF page. Images are not
                 selected. Image pixels underneath redacted text may still be
-                removed. This setting does not apply to TXT documents.
+                removed. This setting does not apply to text documents.
               </p>
               <label className="field-label" htmlFor="redact">
                 Always redact
@@ -760,7 +760,7 @@ export default function App() {
               <div>
                 <strong>File handling</strong>
                 <p>
-                  Documents are held in browser memory. TXT output replaces
+                  Documents are held in browser memory. Text output replaces
                   matched text with [REDACTED]. PDF output removes selected text
                   and image pixels, and standard and XML metadata. Vector
                   graphics are preserved.

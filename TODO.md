@@ -19,6 +19,15 @@ in the browser. Unchecked items are not implemented.
       additional rules and PDF processing, and explain that inference runs locally
       and document contents are not sent to OpenAI.
 
+## Say "text" instead of "TXT"
+
+- [x] Use "text document" or "text file" in user-facing copy instead of "TXT"
+      (upload prompt, file-type error, header help, result summary, output notes).
+      Keep `.txt` where the file extension itself is meant.
+
+Implemented in UI and error messages, README and browser tests. Internal
+identifiers such as `format: "txt"` stay as they are.
+
 ## TXT support
 
 - [x] Accept `.txt` files, including mixed PDF/TXT batches.

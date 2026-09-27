@@ -1,6 +1,6 @@
 # LocalRedact
 
-LocalRedact is a React + TypeScript + Vite app for searchable PDFs and TXT documents.
+LocalRedact is a React + TypeScript + Vite app for searchable PDFs and text documents.
 It combines optional AI detection, explicit terms and independently enabled rules. Files are
 processed locally in a Web Worker with MuPDF WebAssembly and Transformers.js.
 There is no processing backend, upload endpoint, API key, analytics, or account.
@@ -21,7 +21,7 @@ npm ci
 npm run dev
 ```
 
-Open the localhost URL printed by Vite. Select PDF or TXT documents, configure redaction,
+Open the localhost URL printed by Vite. Select PDF or text documents, configure redaction,
 click **Redact document**, review the output, and download it. **Load sample** adds
 a synthetic document and selects rules-only mode, so you can try the PDF pipeline
 without downloading a model. The original Python project is maintained separately.
@@ -60,7 +60,7 @@ clear and re-add files to regenerate already completed results.
 The app is client-side, but it is not an installable offline PWA: the app must be
 served and model assets must be downloaded/cached. There is no service worker.
 
-## TXT handling
+## Text handling
 
 - Add `.txt` files on their own or in a batch with PDFs. Word files and pasted-text
   input are not supported yet.
@@ -68,7 +68,7 @@ served and model assets must be downloaded/cached. There is no service worker.
   encodings and NUL-containing input stop that file before AI inference; save such
   files as UTF-8 text first. Output is always UTF-8 without a BOM.
 - AI detection, explicit terms, keep expressions and enabled identifier rules
-  apply to TXT. The optional PDF header setting does not affect TXT.
+  apply to text files. The optional PDF header setting does not affect text files.
 - Matched text is replaced with `[REDACTED]`. Line endings, blank lines and
   surrounding whitespace are preserved. Overlapping detections are merged.
   Keep terms/expressions preserve matching character ranges from AI redaction;
@@ -78,7 +78,7 @@ served and model assets must be downloaded/cached. There is no service worker.
   can be exported unchanged without loading a model.
 - Review the entire result before sharing. To correct a missed term, add it to
   **Always redact**, clear and re-add the file, and process it again. There is no
-  manual preview editor yet. TXT-only processing does not load the PDF engine.
+  manual preview editor yet. Text-only processing does not load the PDF engine.
 
 ## Rules and PDF handling
 
@@ -213,9 +213,9 @@ Minimal Linux installations may also need Playwright's system browser libraries
 Unit/integration tests exercise the real MuPDF engine with synthetic PDFs: text
 removal after reopening, metadata/attachment stripping, keep precedence, rotated
 pages, input preservation, failure handling, Unicode span alignment and chunk
-coverage. TXT tests cover Unicode/encodings, replacement, line endings, keep
+coverage. Text tests cover Unicode/encodings, replacement, line endings, keep
 precedence, overlapping detections and failures. Browser tests run the production
-build, real worker, PDF/TXT previews and downloads, mixed batches and responsive
+build, real worker, PDF/text previews and downloads, mixed batches and responsive
 layout. Tests do not upload personal documents or
 download model weights. A live AI run must be checked separately on target hardware.
 
@@ -233,7 +233,7 @@ PAYSLIP_LIVE_AI=1 PAYSLIP_NATIVE_GPU=1 npm run test:browser -- --grep 'live AI'
 - `src/App.tsx`: file queue, options, worker lifecycle, result previews/downloads.
 - `src/processor.worker.ts`: model loading, progress, inference and orchestration.
 - `src/pdf.ts`: text/coordinate extraction, permanent redaction and PDF export.
-- `src/text.ts`: TXT decoding, span replacement and UTF-8 text export.
+- `src/text.ts`: text decoding, span replacement and UTF-8 text export.
 - `src/detection.ts`: byte-accurate token alignment and per-token AI detections.
 - `src/rules.ts`: shared precedence, optional header text and rectangle merging.
 - `src/identifierRules.ts`: registry of optional identifier detectors and UI labels.

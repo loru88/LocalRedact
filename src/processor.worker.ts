@@ -88,7 +88,9 @@ self.onmessage = async ({ data }: MessageEvent<ProcessRequest>) => {
       return;
     }
     if (data.format !== "pdf")
-      throw new Error("Unsupported document format. Select a PDF or TXT file.");
+      throw new Error(
+        "Unsupported document format. Select a PDF or text file.",
+      );
     const { processPdf } = await import("./pdf");
     const result = await processPdf(bytes, options, detect, (page, total) =>
       send({

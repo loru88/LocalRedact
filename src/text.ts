@@ -15,7 +15,7 @@ export function decodeText(bytes: ArrayBuffer): string {
     return text;
   } catch {
     throw new Error(
-      "This TXT file could not be read as UTF-8 or BOM-marked UTF-16. Save it as UTF-8 text and add it again. No document was exported.",
+      "This text file could not be read as UTF-8 or BOM-marked UTF-16. Save it as UTF-8 text and add it again. No document was exported.",
     );
   }
 }
