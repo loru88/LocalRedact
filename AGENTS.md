@@ -80,7 +80,8 @@ category exclusion control. AI input uses overlapping 3,000-character chunks wit
   barcode handling.
 - Preserve fresh-document export and metadata stripping. Original annotations,
   attachments and document-level extras are not copied. Password-protected PDFs,
-  interactive forms and PDF pages with no searchable text currently stop processing.
+  interactive forms and nonblank PDF pages with no searchable text stop processing.
+  Empty pages are rebuilt as blank pages and do not invoke AI.
   TXT decoding errors stop the affected file before inference; empty text is valid.
 - Explicitly destroy MuPDF objects/dispose tensors and release Blob URLs when no
   longer needed. Cancellation terminates the worker. Completed files currently

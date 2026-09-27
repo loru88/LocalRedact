@@ -119,8 +119,9 @@ served and model assets must be downloaded/cached. There is no service worker.
   copied. Interactive forms must be flattened locally before processing.
 - Outputs use neutral names such as `localredact_0001.pdf`. Previews render the actual
   saved PDF, rather than a simulated overlay.
-- A page with no searchable text stops that file before inference. Run OCR locally
-  first. Password-protected PDFs must be decrypted locally first. No OCR or
+- A nonblank page with no searchable text stops that file before inference. Run
+  OCR locally first. Empty pages are preserved as fresh blank pages without
+  inference. Password-protected PDFs must be decrypted locally first. No OCR or
   password-entry feature is included.
 
 ## Detection details
@@ -181,7 +182,7 @@ and the existing MuPDF pipeline for permanent redaction.
   progress, reuse workers, and process pages sequentially to limit memory use.
 - Preserve cancellation and per-file error handling. An OCR or scanner failure
   must not silently export a file as successfully scanned. Without scanning enabled,
-  retain the current rejection of pages without searchable text.
+  retain the rejection of nonblank pages without searchable text.
 - OCR can misread or miss text, and barcode readers can miss damaged or unsupported
   codes. No detections does not prove that a page contains no sensitive information.
   OCR also does not expand Privacy Filter's categories: fields such as sex,

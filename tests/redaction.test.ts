@@ -192,7 +192,7 @@ describe("saved PDF redaction", () => {
     let calls = 0;
     await expect(
       processPdf(
-        fixture({ blankPage: true }),
+        fixture({ secondPage: "image" }),
         { ...DEFAULT_OPTIONS, useAi: true },
         async () => {
           calls++;
@@ -202,6 +202,65 @@ describe("saved PDF redaction", () => {
       ),
     ).rejects.toThrow("Page 2 has no searchable text");
     expect(calls).toBe(0);
+  });
+
+  it.each(["blank", "emptyForm"] as const)(
+    "preserves %s pages without inference and redacts surrounding text",
+    async (kind) => {
+      let calls = 0;
+      const result = await processPdf(
+        fixture(
+          kind === "blank"
+            ? { blankPage: true, rotate: 90 }
+            : { secondPage: "emptyForm" },
+        ),
+        { ...rules, useAi: true },
+        async () => {
+          calls++;
+          return [];
+        },
+        () => {},
+      );
+      expect(calls).toBe(1);
+      expect(result.pages).toBe(2);
+      expect(result.previews).toHaveLength(2);
+      const doc = new mupdf.PDFDocument(result.bytes);
+      const first = doc.loadPage(0);
+      const blank = doc.loadPage(1);
+      try {
+        expect(extractPage(first).text).not.toContain("Mario Rossi");
+        expect(extractPage(blank).text).toBe("");
+        expect(blank.getBounds()).toEqual(
+          kind === "blank" ? [0, 0, 842, 595] : [0, 0, 595, 842],
+        );
+        const pixmap = blank.toPixmap(
+          mupdf.Matrix.identity,
+          mupdf.ColorSpace.DeviceRGB,
+          false,
+          false,
+        );
+        try {
+          expect(pixmap.getPixels().every((value) => value === 255)).toBe(true);
+        } finally {
+          pixmap.destroy();
+        }
+      } finally {
+        first.destroy();
+        blank.destroy();
+        doc.destroy();
+      }
+    },
+  );
+
+  it("rejects drawings without text even when they render white", async () => {
+    await expect(
+      processPdf(
+        fixture({ secondPage: "vector" }),
+        DEFAULT_OPTIONS,
+        async () => [],
+        () => {},
+      ),
+    ).rejects.toThrow("Page 2 has no searchable text");
   });
 
   it("does not export after an inference failure", async () => {

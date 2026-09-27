@@ -2,9 +2,15 @@ import * as mupdf from "mupdf";
 
 export function fixture({
   blankPage = false,
+  secondPage,
   rotate = 0,
   headerImage = false,
-}: { blankPage?: boolean; rotate?: 0 | 90; headerImage?: boolean } = {}) {
+}: {
+  blankPage?: boolean;
+  secondPage?: "image" | "vector" | "emptyForm";
+  rotate?: 0 | 90;
+  headerImage?: boolean;
+} = {}) {
   const doc = new mupdf.PDFDocument();
   const font = new mupdf.Font("Helvetica");
   const fontRef = doc.addSimpleFont(font);
@@ -46,8 +52,28 @@ export function fixture({
   annotation.setContents("Sensitive annotation from original");
   annotation.update();
   page.destroy();
-  if (blankPage) {
-    const blank = doc.addPage([0, 0, 595, 842], 0, {}, "");
+  if (blankPage || secondPage) {
+    const emptyForm = doc.addStream("", {
+      Type: "XObject",
+      Subtype: "Form",
+      BBox: [0, 0, 595, 842],
+      Resources: {},
+    });
+    const contents =
+      secondPage === "image"
+        ? "q 200 0 0 200 40 40 cm /Logo Do Q"
+        : secondPage === "vector"
+          ? "1 1 1 rg 40 40 200 200 re f"
+          : secondPage === "emptyForm"
+            ? "q /Empty Do Q"
+            : "";
+    const blank = doc.addPage(
+      [0, 0, 595, 842],
+      rotate,
+      { XObject: { Logo: imageRef, Empty: emptyForm } },
+      contents,
+    );
+    emptyForm.destroy();
     doc.insertPage(-1, blank);
     blank.destroy();
   }

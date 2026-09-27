@@ -116,7 +116,7 @@ test("shows a per-file OCR error and continues the batch", async ({ page }) => {
     {
       name: "scanned-page.pdf",
       mimeType: "application/pdf",
-      buffer: Buffer.from(fixture({ blankPage: true })),
+      buffer: Buffer.from(fixture({ secondPage: "image" })),
     },
     {
       name: "searchable.pdf",
@@ -134,6 +134,30 @@ test("shows a per-file OCR error and continues the batch", async ({ page }) => {
   await expect(
     page.getByText("localredact_0002.pdf", { exact: true }),
   ).toBeVisible();
+});
+
+test("preserves an empty PDF page and allows reviewing the complete output", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Always redact", { exact: true }).fill("Mario Rossi");
+  await page.locator("input[type=file]").setInputFiles({
+    name: "with-blank-page.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from(fixture({ secondPage: "emptyForm" })),
+  });
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", { name: "Download document" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Next page" }).click();
+  await expect(
+    page.getByRole("img", { name: "Redacted document, page 2" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Next page" })).toBeDisabled();
+  await expect(page.locator(".file-error")).toHaveCount(0);
 });
 
 test("validates configuration before starting", async ({ page }) => {

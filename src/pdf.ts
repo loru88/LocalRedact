@@ -59,6 +59,35 @@ export function extractPage(page: mupdf.PDFPage): PageText {
   return result;
 }
 
+// Check drawing operations, not rendered pixels: white or clipped content must
+// not be mistaken for an empty page. Empty pages are rebuilt rather than grafted.
+function hasPageContent(page: mupdf.PDFPage): boolean {
+  let found = false;
+  const mark = () => {
+    found = true;
+  };
+  const device = new mupdf.Device({
+    fillPath: mark,
+    strokePath: mark,
+    fillText: mark,
+    strokeText: mark,
+    clipText: mark,
+    clipStrokeText: mark,
+    ignoreText: mark,
+    fillShade: mark,
+    fillImage: mark,
+    fillImageMask: mark,
+    clipImageMask: mark,
+  });
+  try {
+    page.runPageContents(device, mupdf.Matrix.identity);
+    device.close();
+    return found;
+  } finally {
+    device.destroy();
+  }
+}
+
 export async function processPdf(
   bytes: ArrayBuffer,
   options: Options,
@@ -76,6 +105,7 @@ export async function processPdf(
       );
     const pages = source.countPages();
     if (!pages) throw new Error("This PDF has no pages.");
+    const blankPages = new Set<number>();
     // Preflight the whole document before downloading a model or redacting pages.
     for (let i = 0; i < pages; i++) {
       const page = source.loadPage(i);
@@ -84,10 +114,13 @@ export async function processPdf(
           throw new Error(
             `Page ${i + 1} contains form fields. Flatten the form locally first.`,
           );
-        if (!extractPage(page).text.trim())
-          throw new Error(
-            `Page ${i + 1} has no searchable text. Run OCR locally first; no PDF was exported.`,
-          );
+        if (!extractPage(page).text.trim()) {
+          if (hasPageContent(page))
+            throw new Error(
+              `Page ${i + 1} has no searchable text. Run OCR locally first; no PDF was exported.`,
+            );
+          blankPages.add(i);
+        }
       } finally {
         page.destroy();
       }
@@ -96,6 +129,15 @@ export async function processPdf(
       progress(i + 1, pages);
       const page = source.loadPage(i);
       try {
+        if (blankPages.has(i)) {
+          const blank = output.addPage(page.getBounds(), 0, {}, "");
+          try {
+            output.insertPage(-1, blank);
+          } finally {
+            blank.destroy();
+          }
+          continue;
+        }
         const extracted = extractPage(page);
         const spans = options.useAi ? await detect(extracted.text) : [];
         const rects = redactionRects(
