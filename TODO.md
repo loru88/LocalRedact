@@ -42,6 +42,49 @@ AI starts unchecked, so no model download occurs unless requested.
 and label rules-only output. If AI is checked and fails, the file fails; it
 never silently falls back.
 
+## Progressive web app
+
+- [ ] Make LocalRedact installable on supported mobile phones, with a home-screen
+      icon and a standalone app window.
+- [ ] Add a web app manifest, icons and a service worker for installation and the
+      intended offline experience.
+- [ ] Explain offline limitations, including model downloads and browser cache
+      availability. Keep document contents out of persistent caches.
+
+## WebMCP tools for AI agents
+
+- [ ] Expose redaction as WebMCP tools so a browser agent can redact documents
+      through the page without driving the UI.
+
+Feasibility: medium, and limited by browser support. WebMCP is a Web Machine
+Learning Community Group draft. As of September 2026 only Chrome implements it,
+behind `chrome://flags/#enable-webmcp-testing` or an origin trial, on HTTPS.
+The API moved from `navigator.modelContext` to `document.modelContext`
+(the old name is deprecated in Chromium 150), so it is still changing.
+Treat it as progressive enhancement: feature-detect it and register nothing
+when it is missing.
+
+High-level approach:
+
+- Register a small set of tools from the app, e.g. `get_redaction_options`,
+  `redact_text` (text in, redacted text and found spans out), and
+  `redact_files` (process files already queued or added by the user, return
+  a summary and make downloads available). Reuse the existing worker path
+  and `Options` so agent calls and UI clicks behave the same way.
+- Text is the easy case: it can be passed as a tool argument. Binary files
+  such as PDFs are harder, because tool arguments are JSON; they would need
+  base64 input or a flow where the user picks the file and the agent only
+  starts processing. Check what the spec allows before choosing.
+- Privacy: tool calls come from an agent that may send the results
+  to a remote model. Returning redacted output is fine, but returning the
+  original text or detected spans sends sensitive content to the agent, so
+  document this clearly and keep detections out of tool results by default.
+  Consider requiring user confirmation (if the API provides it) before a tool
+  processes a document.
+- The AI option still means a 917 MB download and WebGPU; the tool should
+  report that instead of hiding it, and fail rather than fall back.
+- Add a browser test that stubs `document.modelContext` and calls the tools.
+
 ## TXT support
 
 - [x] Accept `.txt` files, including mixed PDF/TXT batches.
