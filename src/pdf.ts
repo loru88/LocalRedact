@@ -97,8 +97,7 @@ export async function processPdf(
       const page = source.loadPage(i);
       try {
         const extracted = extractPage(page);
-        const spans =
-          options.mode === "model" ? await detect(extracted.text) : [];
+        const spans = options.useAi ? await detect(extracted.text) : [];
         const rects = redactionRects(
           extracted,
           page.getBounds(),

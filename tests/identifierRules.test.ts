@@ -8,7 +8,7 @@ const run = async (text: string, enabledRules: string[]) =>
   (
     await processText(
       sourceBytes(text),
-      { ...DEFAULT_OPTIONS, mode: "rules", enabledRules, keepRegexes: [".+"] },
+      { ...DEFAULT_OPTIONS, useAi: false, enabledRules, keepRegexes: [".+"] },
       async () => {
         throw new Error("Unexpected inference");
       },

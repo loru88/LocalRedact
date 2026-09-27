@@ -35,21 +35,26 @@ Deploy `dist/` to any static HTTPS host. Relative asset paths also support hosti
 in a subfolder. Do not open `index.html` using `file://`; workers and model loading
 need HTTP(S). No server-side application runtime is required.
 
-## Detection modes
+## Rules and optional AI
 
-- **AI + selected rules** (default): downloads `openai/privacy-filter` in q4 format
-  on first use, approximately 917 MB of model weights plus tokenizer/runtime
-  assets. Requests retrieve public assets from Hugging Face and its CDN and the
-  ONNX runtime CDN; document contents are never included. Browser caching is best-effort
-  and subject to storage quotas. Model initialization needs more memory than the
-  download size. WebGPU requires compatible hardware/browser and HTTPS or
-  localhost. AI requires WebGPU: the published quantized models use
-  `GatherBlockQuantized`, which the tested browser CPU/WASM runtime does not
-  implement. The app checks for a GPU adapter before downloading model weights.
-- **Rules only**: no model download, and no automatic general-purpose detection
-  of names, addresses, emails, dates, etc. Those details are removed only if a
-  enabled rule, optional PDF header, or explicit term covers them. This mode is always
-  labelled in results. A model failure never silently switches to rules-only.
+Enabled rules, the PDF header option and redact/keep terms apply whether AI is
+enabled or not. **add AI detection** is unchecked by default.
+
+- **Rules only** (default): no model download, and no automatic general-purpose
+  detection of names, addresses, emails, dates, etc. Those details are removed
+  only if an enabled rule, optional PDF header, or explicit term covers them.
+  Results are labelled “rules only”; other personal information may remain.
+- **add AI detection**: adds model detections to the selected rules.
+  Downloads `openai/privacy-filter` in q4 format on first use, approximately
+  917 MB of model weights plus tokenizer/runtime assets. Requests retrieve public
+  assets from Hugging Face and its CDN and the ONNX runtime CDN; document contents
+  are never included. Browser caching is best-effort and subject to storage
+  quotas. Model initialization needs more memory than the download size.
+  AI requires compatible hardware/browser with WebGPU and HTTPS or localhost:
+  the published quantized models use `GatherBlockQuantized`, which the tested
+  browser CPU/WASM runtime does not implement. The app checks for a GPU adapter
+  before downloading model weights. If AI fails, the file fails; the app never
+  silently switches to rules only.
 
 Documents and generated results are held in memory. **Clear files** revokes result URLs;
 reloading closes the processing session. **Cancel processing** terminates the
@@ -83,7 +88,7 @@ served and model assets must be downloaded/cached. There is no service worker.
 ## Rules and PDF handling
 
 - Identifier rules and PDF header removal are independently enabled and **off by
-  default**, in both detection modes. There are no automatic banking-line rules
+  default**, with or without AI. There are no automatic banking-line rules
   or salary-field exceptions.
 - **Italian fiscal codes**: matches the 16-character personal fiscal-code pattern,
   without checksum validation. This optional matcher is isolated from the shared
@@ -154,8 +159,8 @@ and the existing MuPDF pipeline for permanent redaction.
    duplicating text at the same location. Start with Italian and English language
    data. Preserve the rendering and rotation transforms so OCR coordinates map
    accurately back to PDF coordinates.
-3. **Apply the selected text detection mode.** Pass the combined text and word
-   positions through the existing rules and, in AI mode, Privacy Filter. Rules-only
+3. **Apply the selected text detection settings.** Pass the combined text and word
+   positions through the existing rules and, with AI enabled, Privacy Filter. Rules-only
    mode would support OCR and explicit terms without downloading Privacy Filter.
 4. **Scan barcodes and QR codes separately.** Use ZXing-WASM to locate supported
    codes. The proposed default when scanning is enabled is to redact every detected

@@ -19,9 +19,9 @@ test("processes and downloads PDFs entirely locally in the production build", as
   await expect(
     page.getByText("example-payslip.pdf", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Detection", { exact: true })).toHaveValue(
-    "rules",
-  );
+  await expect(
+    page.getByLabel("add AI detection", { exact: true }),
+  ).not.toBeChecked();
   await page
     .getByRole("button", { name: "Redact document", exact: true })
     .click();
@@ -55,9 +55,63 @@ test("processes and downloads PDFs entirely locally in the production build", as
   await expect(download).not.toBeVisible();
 });
 
+test("AI is an optional addition and text file guidance uses plain language", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const ai = page.getByLabel("add AI detection", { exact: true });
+  await expect(ai).not.toBeChecked();
+  await expect(
+    page.getByText("Rules match known patterns and terms you enter.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "OpenAI Privacy Filter" }),
+  ).toHaveAttribute("href", "https://huggingface.co/openai/privacy-filter");
+  await expect(
+    page.getByRole("link", { name: "OpenAI Privacy Filter" }),
+  ).toHaveAttribute("target", "_blank");
+  await expect(page.locator(".settings-panel .notice")).toHaveCount(0);
+  await expect(
+    page.getByText("approximately 917 MB", { exact: false }),
+  ).toHaveCount(0);
+  await expect(page.getByText("PDF or text", { exact: true })).toBeVisible();
+  await page.getByLabel("Always redact", { exact: true }).fill("Maria");
+  await page.getByLabel("IBAN bank accounts", { exact: true }).check();
+  await ai.check();
+  await expect(
+    page.getByRole("note", { name: "AI detection details" }),
+  ).toBeVisible();
+  await expect(page.getByRole("note").getByRole("listitem")).toHaveCount(4);
+  await expect(
+    page.getByText("approximately 917 MB", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Runs locally with WebGPU.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await ai.uncheck();
+  await expect(page.getByLabel("Always redact", { exact: true })).toHaveValue(
+    "Maria",
+  );
+  await expect(
+    page.getByLabel("IBAN bank accounts", { exact: true }),
+  ).toBeChecked();
+  await page.locator("input[type=file]").setInputFiles({
+    name: "unsupported.docx",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from("synthetic"),
+  });
+  await expect(page.getByRole("alert")).toHaveText(
+    "Only PDF and text documents can be added.",
+  );
+});
+
 test("shows a per-file OCR error and continues the batch", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Detection", { exact: true }).selectOption("rules");
+  await page.getByLabel("add AI detection", { exact: true }).uncheck();
   await page.locator("input[type=file]").setInputFiles([
     {
       name: "scanned-page.pdf",
@@ -104,7 +158,7 @@ test("AI download failure never falls back to rules-only export", async ({
   );
   await page.goto("/");
   await page.getByRole("button", { name: /Load sample/ }).click();
-  await page.getByLabel("Detection", { exact: true }).selectOption("model");
+  await page.getByLabel("add AI detection", { exact: true }).check();
   await page
     .getByRole("button", { name: "Redact document", exact: true })
     .click();
@@ -112,9 +166,9 @@ test("AI download failure never falls back to rules-only export", async ({
   await expect(
     page.getByRole("link", { name: "Download document" }),
   ).not.toBeVisible();
-  await expect(page.getByLabel("Detection", { exact: true })).toHaveValue(
-    "model",
-  );
+  await expect(
+    page.getByLabel("add AI detection", { exact: true }),
+  ).toBeChecked();
 });
 
 test("cancels model loading and can restart in the explicitly selected rules mode", async ({
@@ -128,7 +182,7 @@ test("cancels model loading and can restart in the explicitly selected rules mod
   });
   await page.goto("/");
   await page.getByRole("button", { name: /Load sample/ }).click();
-  await page.getByLabel("Detection", { exact: true }).selectOption("model");
+  await page.getByLabel("add AI detection", { exact: true }).check();
   await page
     .getByRole("button", { name: "Redact document", exact: true })
     .click();
@@ -142,7 +196,7 @@ test("cancels model loading and can restart in the explicitly selected rules mod
   await expect(
     page.getByRole("link", { name: "Download document" }),
   ).not.toBeVisible();
-  await page.getByLabel("Detection", { exact: true }).selectOption("rules");
+  await page.getByLabel("add AI detection", { exact: true }).uncheck();
   await page
     .getByRole("button", { name: "Redact document", exact: true })
     .click();

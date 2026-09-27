@@ -28,6 +28,20 @@ in the browser. Unchecked items are not implemented.
 Implemented in UI and error messages, README and browser tests. Internal
 identifiers such as `format: "txt"` stay as they are.
 
+## Rules as the base, AI as an add-on
+
+- [x] Replace the "Detection" select with "add AI detection".
+      Enabled rules, the header option and redact/keep terms always apply;
+      the checkbox only adds model spans on top.
+- [x] Show a one-line benefit and model link below the checkbox, with concise
+      download, WebGPU and limitation bullets in a notice when enabled. Explain
+      rules above it and open the model link in a new tab.
+
+AI starts unchecked, so no model download occurs unless requested.
+`Options.useAi` controls the additional detections; results record that setting
+and label rules-only output. If AI is checked and fails, the file fails; it
+never silently falls back.
+
 ## TXT support
 
 - [x] Accept `.txt` files, including mixed PDF/TXT batches.

@@ -11,6 +11,7 @@ test("live AI redacts a name without an explicit term", async ({ page }) => {
   );
   test.setTimeout(600_000);
   await page.goto("/");
+  await page.getByLabel("add AI detection", { exact: true }).check();
   await page.locator("input[type=file]").setInputFiles({
     name: "synthetic.pdf",
     mimeType: "application/pdf",

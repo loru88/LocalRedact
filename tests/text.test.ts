@@ -3,7 +3,7 @@ import { decodeText, processText } from "../src/text";
 import { DEFAULT_OPTIONS, type Options, type Span } from "../src/types";
 
 const bytes = (text: string) => new TextEncoder().encode(text).buffer;
-const rules: Options = { ...DEFAULT_OPTIONS, mode: "rules" };
+const rules: Options = { ...DEFAULT_OPTIONS, useAi: false };
 const noModel = vi.fn(async (): Promise<Span[]> => {
   throw new Error("Unexpected model call");
 });
@@ -40,7 +40,7 @@ describe("TXT processing", () => {
     const start = source.indexOf("Maria Rossi");
     const result = await processText(
       bytes(source),
-      DEFAULT_OPTIONS,
+      { ...DEFAULT_OPTIONS, useAi: true },
       async () => [[start, start + 11]],
     );
     expect(result.text).toBe(
@@ -72,7 +72,7 @@ describe("TXT processing", () => {
     const source = "Maria Rossi met Luca Bianchi.";
     const result = await processText(
       bytes(source),
-      DEFAULT_OPTIONS,
+      { ...DEFAULT_OPTIONS, useAi: true },
       async () => [
         [0, 5],
         [5, 11],
@@ -90,6 +90,7 @@ describe("TXT processing", () => {
       bytes("Maria Rossi met Luca"),
       {
         ...DEFAULT_OPTIONS,
+        useAi: true,
         keepTerms: ["Rossi"],
         keepRegexes: ["Luca"],
       },
@@ -143,7 +144,11 @@ describe("TXT processing", () => {
       [0xff, 0xfe, 0x61],
     ]) {
       await expect(
-        processText(new Uint8Array(data).buffer, DEFAULT_OPTIONS, detect),
+        processText(
+          new Uint8Array(data).buffer,
+          { ...DEFAULT_OPTIONS, useAi: true },
+          detect,
+        ),
       ).rejects.toThrow("Save it as UTF-8");
     }
     expect(detect).not.toHaveBeenCalled();
@@ -151,7 +156,11 @@ describe("TXT processing", () => {
 
   it("preserves empty and whitespace-only files without downloading a model", async () => {
     for (const text of ["", " \r\n\t"]) {
-      const result = await processText(bytes(text), DEFAULT_OPTIONS, noModel);
+      const result = await processText(
+        bytes(text),
+        { ...DEFAULT_OPTIONS, useAi: true },
+        noModel,
+      );
       expect(result.text).toBe(text);
       expect(result.marks).toBe(0);
     }
@@ -159,9 +168,13 @@ describe("TXT processing", () => {
 
   it("fails instead of exporting on model errors or invalid span offsets", async () => {
     await expect(
-      processText(bytes("Maria"), DEFAULT_OPTIONS, async () => {
-        throw new Error("Model failed");
-      }),
+      processText(
+        bytes("Maria"),
+        { ...DEFAULT_OPTIONS, useAi: true },
+        async () => {
+          throw new Error("Model failed");
+        },
+      ),
     ).rejects.toThrow("Model failed");
     for (const span of [
       [-1, 3],
@@ -170,7 +183,11 @@ describe("TXT processing", () => {
       [0, NaN],
     ] as Span[]) {
       await expect(
-        processText(bytes("Maria"), DEFAULT_OPTIONS, async () => [span]),
+        processText(
+          bytes("Maria"),
+          { ...DEFAULT_OPTIONS, useAi: true },
+          async () => [span],
+        ),
       ).rejects.toThrow("No document was exported");
     }
   });

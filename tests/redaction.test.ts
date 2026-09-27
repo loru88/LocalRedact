@@ -7,7 +7,7 @@ import { fixture } from "./fixture";
 
 const rules: Options = {
   ...DEFAULT_OPTIONS,
-  mode: "rules",
+  useAi: false,
   enabledRules: ["italianFiscalCode", "iban"],
   redactHeader: true,
   redactTerms: ["Mario Rossi"],
@@ -17,7 +17,7 @@ describe("saved PDF redaction", () => {
   it("leaves header text, banking lines and identifiers intact with flags off", async () => {
     const result = await processPdf(
       fixture(),
-      { ...DEFAULT_OPTIONS, mode: "rules" },
+      { ...DEFAULT_OPTIONS, useAi: false },
       async () => [],
       () => {},
     );
@@ -147,7 +147,12 @@ describe("saved PDF redaction", () => {
     const original = new Uint8Array(input).slice();
     const result = await processPdf(
       input,
-      { ...DEFAULT_OPTIONS, headerFraction: 0, keepTerms: ["Mario Rossi"] },
+      {
+        ...DEFAULT_OPTIONS,
+        useAi: true,
+        headerFraction: 0,
+        keepTerms: ["Mario Rossi"],
+      },
       async (text) =>
         termSpans(text, [
           "Mario Rossi",
@@ -188,7 +193,7 @@ describe("saved PDF redaction", () => {
     await expect(
       processPdf(
         fixture({ blankPage: true }),
-        DEFAULT_OPTIONS,
+        { ...DEFAULT_OPTIONS, useAi: true },
         async () => {
           calls++;
           return [];
@@ -203,7 +208,7 @@ describe("saved PDF redaction", () => {
     await expect(
       processPdf(
         fixture(),
-        DEFAULT_OPTIONS,
+        { ...DEFAULT_OPTIONS, useAi: true },
         async () => {
           throw new Error("Model failed");
         },

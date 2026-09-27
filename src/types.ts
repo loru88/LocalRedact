@@ -25,7 +25,7 @@ export interface PageText {
   images: Rect[];
 }
 export interface Options {
-  mode: "model" | "rules";
+  useAi: boolean;
   enabledRules: string[];
   redactHeader: boolean;
   headerFraction: number;
@@ -35,7 +35,7 @@ export interface Options {
   prefix: string;
 }
 export const DEFAULT_OPTIONS: Options = {
-  mode: "model",
+  useAi: false,
   enabledRules: [],
   redactHeader: false,
   headerFraction: 0.18,

@@ -29,8 +29,10 @@ and manual redaction controls remain planned features.
 
 AI uses `openai/privacy-filter` with q4 weights, approximately 917 MB plus runtime
 and tokenizer assets. In the tested implementation it requires WebGPU; the
-quantized model cannot use the tested CPU/WASM backend. Rules-only mode is an
-explicit user choice. The model detects text spans, not PDF geometry or images,
+quantized model cannot use the tested CPU/WASM backend. Rules-only processing is
+the default. The unchecked “add AI detection” checkbox sets `Options.useAi`;
+enabled rules and terms always apply. The model detects text spans, not PDF
+geometry or images,
 and can miss personal information. Do not promise complete anonymization.
 
 ## Code map and processing flow

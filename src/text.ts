@@ -56,7 +56,7 @@ export async function processText(
   const source = decodeText(bytes);
   const { keep, mandatory } = textRuleSpans(source, options);
   const predictions =
-    options.mode === "model" && source.trim() ? await detect(source) : [];
+    options.useAi && source.trim() ? await detect(source) : [];
   const model = predictions.map((span) => checkedSpan(source, span));
   // Keep terms override only AI spans. Mandatory rules are added afterwards.
   const optional = model.flatMap((span) => {

@@ -8,7 +8,9 @@ test("redacts TXT locally, previews literal text and downloads matching UTF-8 ou
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.goto("/");
-  await page.getByLabel("Detection", { exact: true }).selectOption("rules");
+  await expect(
+    page.getByLabel("add AI detection", { exact: true }),
+  ).not.toBeChecked();
   await page.getByLabel("Always redact", { exact: true }).fill("Maria Rossi");
   const markup = "<img src=https://example.invalid/private onerror=alert(1)>";
   const source = `Città 😀\r\nMaria Rossi\r\n${markup}\r\n${"x".repeat(500)}\r\n`;
@@ -30,6 +32,13 @@ test("redacts TXT locally, previews literal text and downloads matching UTF-8 ou
     page.getByText("Skip AI categories", { exact: true }),
   ).toHaveCount(0);
   await expect(page.locator(".intro-note")).toHaveCount(0);
+  await expect(
+    page.getByText("Text document · 1 redactions · rules only"),
+  ).toBeVisible();
+  await page.getByLabel("add AI detection", { exact: true }).check();
+  await expect(
+    page.getByText("Rules-only result:", { exact: false }),
+  ).toBeVisible();
   const downloaded = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download document" }).click();
   const download = await downloaded;
@@ -60,7 +69,7 @@ test("continues a mixed batch after invalid TXT and switches between text and PD
   page,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Detection", { exact: true }).selectOption("rules");
+  await page.getByLabel("add AI detection", { exact: true }).uncheck();
   await page.getByLabel("Always redact", { exact: true }).fill("Mario Rossi");
   await page.locator("input[type=file]").setInputFiles([
     {
@@ -117,6 +126,7 @@ test("TXT model download failure does not export a rules-only result", async ({
     route.abort("failed"),
   );
   await page.goto("/");
+  await page.getByLabel("add AI detection", { exact: true }).check();
   await page.getByText("Advanced options", { exact: true }).click();
   await expect(
     page.getByText("Skip AI categories", { exact: true }),
@@ -133,16 +143,16 @@ test("TXT model download failure does not export a rules-only result", async ({
   await expect(
     page.getByRole("link", { name: "Download document" }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("Detection", { exact: true })).toHaveValue(
-    "model",
-  );
+  await expect(
+    page.getByLabel("add AI detection", { exact: true }),
+  ).toBeChecked();
 });
 
 test("identifier flags independently control TXT processing", async ({
   page,
 }) => {
   await page.goto("/");
-  await page.getByLabel("Detection", { exact: true }).selectOption("rules");
+  await page.getByLabel("add AI detection", { exact: true }).uncheck();
   await expect(
     page.getByLabel("Italian fiscal codes", { exact: true }),
   ).not.toBeChecked();

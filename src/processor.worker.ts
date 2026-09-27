@@ -15,7 +15,7 @@ async function getClassifier(id: string) {
   ).gpu;
   if (!gpu || !(await gpu.requestAdapter())) {
     throw new Error(
-      "WebGPU is unavailable. AI detection requires a compatible browser and GPU on HTTPS or localhost. Select Rules only to process without AI detection.",
+      "WebGPU is unavailable. AI detection requires a compatible browser and GPU on HTTPS or localhost. Uncheck “add AI detection” to process without AI.",
     );
   }
   send({

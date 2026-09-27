@@ -22,7 +22,7 @@ type Job = {
   outputName?: string;
   marks?: number;
   pages?: number;
-  mode?: Options["mode"];
+  useAi?: boolean;
 };
 const lines = (text: string) =>
   text
@@ -220,7 +220,7 @@ export default function App() {
             marks: result.marks,
             pages: result.format === "pdf" ? result.pages : undefined,
             outputName: `${options.prefix}_${String(index).padStart(4, "0")}.${result.format}`,
-            mode: options.mode,
+            useAi: options.useAi,
           });
           setSelected(job.id);
           setPage(0);
@@ -285,7 +285,7 @@ export default function App() {
       ]);
       setOptions((old) => ({
         ...old,
-        mode: "rules",
+        useAi: false,
         redactTerms: [...new Set([...old.redactTerms, "Mario Rossi"])],
       }));
     } catch (e) {
@@ -406,7 +406,7 @@ export default function App() {
                         <span>
                           {sizes(job.file.size)} ·{" "}
                           {job.status === "done"
-                            ? `${job.format === "pdf" ? `${job.pages} page${job.pages === 1 ? "" : "s"}` : "Text document"} · ${job.marks} redactions${job.mode === "rules" ? " · rules only" : ""}`
+                            ? `${job.format === "pdf" ? `${job.pages} page${job.pages === 1 ? "" : "s"}` : "Text document"} · ${job.marks} redactions${!job.useAi ? " · rules only" : ""}`
                             : job.status === "processing"
                               ? "Processing locally…"
                               : job.status === "ready"
@@ -449,8 +449,8 @@ export default function App() {
               )}
               <div className="action-row">
                 <span>
-                  {options.mode === "model"
-                    ? "AI detection + selected rules"
+                  {options.useAi
+                    ? "Selected rules + AI detection"
                     : "Selected rules only · AI is off"}
                 </span>
                 {running ? (
@@ -513,7 +513,7 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  {chosen.mode === "rules" && (
+                  {!chosen.useAi && (
                     <p className="notice">
                       Rules-only result: text is removed where an enabled rule
                       or an explicit term matches. Names and addresses may
@@ -571,69 +571,46 @@ export default function App() {
               </div>
             </div>
             <fieldset disabled={running}>
-              <label className="field-label" htmlFor="mode">
-                Detection
+              <p className="help">
+                Rules match known patterns and terms you enter.
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={options.useAi}
+                  onChange={(e) => update("useAi", e.target.checked)}
+                />{" "}
+                add AI detection
               </label>
-              <select
-                id="mode"
-                value={options.mode}
-                onChange={(e) =>
-                  update("mode", e.target.value as Options["mode"])
-                }
-              >
-                <option value="model">AI + selected rules</option>
-                <option value="rules">Rules only (no model download)</option>
-              </select>
-              {options.mode === "model" ? (
-                <>
-                  <div
-                    className="notice"
-                    role="note"
-                    aria-label="AI detection limitations"
-                  >
-                    <strong>
-                      Detection can miss or incorrectly select text.
-                    </strong>
-                    <p>
-                      OpenAI Privacy Filter may miss names and other sensitive
-                      text, especially in non-English documents or unfamiliar
-                      layouts. Fields such as sex, citizenship and birthplace
-                      may remain visible. It does not inspect images or barcode
-                      contents.
-                    </p>
-                    <p>
-                      Review the entire document before sharing. Add missed text
-                      to “Always redact”, clear and re-add your files, then
-                      process them again. For details inside images or barcodes,
-                      use a PDF editor that permanently redacts image content if
-                      they remain visible in the preview.
-                    </p>
-                  </div>
-                  <p className="help">
-                    Rules match known patterns and terms you enter. Privacy
-                    Filter also uses context to identify personal information,
-                    such as names and addresses, without an explicit term.
-                  </p>
-                  <p className="help">
-                    AI mode uses OpenAI Privacy Filter. The first use downloads
-                    approximately 917 MB of model weights plus runtime files.
-                    Loading the model requires additional memory. Your browser
-                    may cache the files, but may need to download them again.
-                  </p>
-                  <p className="help">
-                    Processing runs locally; document contents are not sent to
-                    OpenAI. AI requires a browser and GPU with WebGPU support,
-                    using HTTPS or localhost. If AI processing fails, that file
-                    is not exported. Rules-only mode must be selected
-                    explicitly.
-                  </p>
-                </>
-              ) : (
-                <p className="notice">
-                  AI is off. Only enabled rules, the optional PDF header area
-                  and terms you enter are redacted. Other personal information
-                  may remain.
-                </p>
+              <p className="help">
+                Automatically redact names, emails, codes and other sensitive
+                text with{" "}
+                <a
+                  href="https://huggingface.co/openai/privacy-filter"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  OpenAI Privacy Filter
+                </a>
+                .
+              </p>
+              {options.useAi && (
+                <div
+                  className="notice"
+                  role="note"
+                  aria-label="AI detection details"
+                >
+                  <ul>
+                    <li>Runs locally with WebGPU.</li>
+                    <li>
+                      First use downloads approximately 917 MB plus runtime
+                      files and needs additional memory; cached files may need
+                      downloading again.
+                    </li>
+                    <li>Detection can miss text: review before sharing.</li>
+                    <li>AI failures stop export.</li>
+                  </ul>
+                </div>
               )}
               <div className="divider" />
               {IDENTIFIER_RULES.map((rule) => (
