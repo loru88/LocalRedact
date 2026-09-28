@@ -139,12 +139,19 @@ export async function processPdf(
           continue;
         }
         const extracted = extractPage(page);
+        if (options.debugPdfText) {
+          console.log(
+            `[LocalRedact] Extracted PDF text — page ${i + 1}/${pages}`,
+            extracted.text,
+          );
+        }
         const spans = options.useAi ? await detect(extracted.text) : [];
         const rects = redactionRects(
           extracted,
           page.getBounds(),
           options,
           spans,
+          i,
         );
         for (const rect of rects) {
           const annot = page.createAnnotation("Redact");

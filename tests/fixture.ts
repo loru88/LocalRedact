@@ -5,11 +5,15 @@ export function fixture({
   secondPage,
   rotate = 0,
   headerImage = false,
+  formDate = false,
+  payrollDates = false,
 }: {
   blankPage?: boolean;
-  secondPage?: "image" | "vector" | "emptyForm";
+  secondPage?: "image" | "vector" | "emptyForm" | "text";
   rotate?: 0 | 90;
   headerImage?: boolean;
+  formDate?: boolean;
+  payrollDates?: boolean;
 } = {}) {
   const doc = new mupdf.PDFDocument();
   const font = new mupdf.Font("Helvetica");
@@ -21,6 +25,7 @@ export function fixture({
     [350, 68, "Gennaio 2026"],
     [45, 240, "Dipendente: Mario Rossi"],
     [45, 265, "Codice fiscale: RSSMRA80A01H501U"],
+    [45, 290, "Email: info@example.com"],
     [45, 320, "BANCA ESEMPIO - Conto 123456789"],
     [45, 350, "IBAN IT60X0542811101000000123456"],
     [45, 380, "IBAN GB82 WEST 1234 5698 7654 32"],
@@ -28,6 +33,16 @@ export function fixture({
     [400, 690, "NETTO DEL MESE"],
     [400, 708, "1.950,00"],
   ];
+  if (formDate)
+    lines.push(
+      [45, 480, "GIORNO MESE ANNO"],
+      [45, 500, "29"],
+      [45, 520, "02"],
+      [45, 540, "2000"],
+      [45, 570, "Unrelated value: 12345"],
+    );
+  if (payrollDates)
+    lines.push([45, 600, "AL 01/01/2026"], [45, 620, "dal 1/1/2025 alla data"]);
   const contents = lines
     .map(([x, y, text]) => `BT /F1 11 Tf ${x} ${842 - y} Td (${text}) Tj ET`)
     .join("\n");
@@ -52,7 +67,17 @@ export function fixture({
   annotation.setContents("Sensitive annotation from original");
   annotation.update();
   page.destroy();
-  if (blankPage || secondPage) {
+  if (secondPage === "text") {
+    const second = doc.addPage(
+      [0, 0, 595, 842],
+      rotate,
+      { Font: { F1: fontRef } },
+      contents,
+    );
+    doc.insertPage(-1, second);
+    second.destroy();
+  }
+  if (blankPage || (secondPage && secondPage !== "text")) {
     const emptyForm = doc.addStream("", {
       Type: "XObject",
       Subtype: "Form",

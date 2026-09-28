@@ -6,7 +6,11 @@ import {
   type Word,
 } from "./types";
 
-import { IDENTIFIER_RULES } from "./identifierRules";
+import {
+  IDENTIFIER_RULES,
+  italianPayrollAmountSpans,
+  italianPayrollDateSpans,
+} from "./identifierRules";
 
 export const union = (a: Rect, b: Rect): Rect => [
   Math.min(a[0], b[0]),
@@ -36,6 +40,12 @@ export function textRuleSpans(text: string, options: Options) {
   const keep = [
     ...termSpans(text, options.keepTerms),
     ...options.keepRegexes.flatMap((p) => matches(text, new RegExp(p, "giu"))),
+    ...(IDENTIFIER_RULES.some(
+      (rule) =>
+        rule.pack === "italian" && options.enabledRules.includes(rule.id),
+    )
+      ? italianPayrollAmountSpans(text)
+      : []),
   ];
   const mandatory: Span[] = [
     ...IDENTIFIER_RULES.filter((rule) =>
@@ -54,8 +64,8 @@ export function validateOptions(options: Options) {
     )
   )
     throw new Error("Unknown identifier rule.");
-  if (typeof options.redactHeader !== "boolean")
-    throw new Error("Header redaction must be enabled or disabled.");
+  if (typeof options.headerAllPages !== "boolean")
+    throw new Error("Header page selection must be enabled or disabled.");
   if (
     !Number.isFinite(options.headerFraction) ||
     options.headerFraction < 0 ||
@@ -99,11 +109,20 @@ export function redactionRects(
   bounds: Rect,
   options: Options,
   modelSpans: Span[],
+  pageIndex: number,
 ): Rect[] {
   const { text, words } = page;
   const { keep, mandatory } = textRuleSpans(text, options);
+  const italianPackEnabled = IDENTIFIER_RULES.some(
+    (rule) => rule.pack === "italian" && options.enabledRules.includes(rule.id),
+  );
+  const italianPayrollDates = italianPackEnabled
+    ? italianPayrollDateSpans(text)
+    : [];
   const protectedWords = new Set([
-    ...words.flatMap((w, i) => (overlaps(w, keep) ? [i] : [])),
+    ...words.flatMap((w, i) =>
+      overlaps(w, [...keep, ...italianPayrollDates]) ? [i] : [],
+    ),
   ]);
   const headerLimit =
     bounds[1] + (bounds[3] - bounds[1]) * options.headerFraction;
@@ -111,7 +130,7 @@ export function redactionRects(
     const forced = overlaps(w, mandatory);
     const optional =
       overlaps(w, modelSpans) ||
-      (options.redactHeader &&
+      ((pageIndex === 0 || options.headerAllPages) &&
         options.headerFraction > 0 &&
         w.rect[1] < headerLimit);
     return forced || (optional && !protectedWords.has(i)) ? [w.rect] : [];

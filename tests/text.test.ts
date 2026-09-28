@@ -32,7 +32,7 @@ describe("TXT processing", () => {
       (
         await processText(
           bytes(source),
-          { ...rules, redactHeader: true, headerFraction: 1 },
+          { ...rules, headerAllPages: true, headerFraction: 1 },
           noModel,
         )
       ).text,

@@ -613,7 +613,38 @@ export default function App() {
                 </div>
               )}
               <div className="divider" />
-              {IDENTIFIER_RULES.map((rule) => (
+              <section aria-label="Moduli IT pack">
+                <label>
+                  <input
+                    type="checkbox"
+                    aria-label="Moduli IT"
+                    checked={IDENTIFIER_RULES.filter(
+                      (rule) => rule.pack === "italian",
+                    ).every((rule) => options.enabledRules.includes(rule.id))}
+                    onChange={(e) => {
+                      const italianIds = IDENTIFIER_RULES.filter(
+                        (rule) => rule.pack === "italian",
+                      ).map((rule) => rule.id);
+                      update(
+                        "enabledRules",
+                        e.target.checked
+                          ? [
+                              ...new Set([
+                                ...options.enabledRules,
+                                ...italianIds,
+                              ]),
+                            ]
+                          : options.enabledRules.filter(
+                              (id) => !italianIds.includes(id),
+                            ),
+                      );
+                    }}
+                  />{" "}
+                  Moduli IT
+                </label>
+                <p className="help">Italian payslip fields and identifiers.</p>
+              </section>
+              {IDENTIFIER_RULES.filter((rule) => !rule.pack).map((rule) => (
                 <div key={rule.id}>
                   <label>
                     <input
@@ -635,14 +666,6 @@ export default function App() {
                   <p className="help">{rule.description}</p>
                 </div>
               ))}
-              <label>
-                <input
-                  type="checkbox"
-                  checked={options.redactHeader}
-                  onChange={(e) => update("redactHeader", e.target.checked)}
-                />{" "}
-                Redact PDF header text
-              </label>
               <div className="range-heading">
                 <label className="field-label" htmlFor="header">
                   Header size (PDF only)
@@ -651,7 +674,6 @@ export default function App() {
               </div>
               <input
                 id="header"
-                disabled={!options.redactHeader}
                 type="range"
                 min="0"
                 max="100"
@@ -660,10 +682,20 @@ export default function App() {
                   update("headerFraction", Number(e.target.value) / 100)
                 }
               />
+              <label>
+                <input
+                  type="checkbox"
+                  checked={options.headerAllPages}
+                  onChange={(e) => update("headerAllPages", e.target.checked)}
+                />{" "}
+                Apply header redaction to every page
+              </label>
               <p className="help">
-                Remove text in the top portion of each PDF page. Images are not
-                selected. Image pixels underneath redacted text may still be
-                removed. This setting does not apply to text documents.
+                Set above 0% to remove text in the top portion of the first PDF
+                page, or every page when checked. At 0%, header redaction is
+                off. Images are not selected, but pixels underneath redacted
+                text may still be removed. This setting does not apply to text
+                documents.
               </p>
               <label className="field-label" htmlFor="redact">
                 Always redact
@@ -700,6 +732,19 @@ export default function App() {
               </p>
               <details>
                 <summary>Advanced options</summary>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={options.debugPdfText}
+                    onChange={(e) => update("debugPdfText", e.target.checked)}
+                    aria-describedby="debug-pdf-help"
+                  />{" "}
+                  Debug: log extracted PDF text
+                </label>
+                <p className="help" id="debug-pdf-help">
+                  Logs unredacted text to the browser console before AI
+                  detection. May contain personal data. Also works with AI off.
+                </p>
                 <label className="field-label" htmlFor="regex">
                   Keep expressions
                 </label>

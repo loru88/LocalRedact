@@ -26,8 +26,9 @@ export interface PageText {
 }
 export interface Options {
   useAi: boolean;
+  debugPdfText: boolean;
   enabledRules: string[];
-  redactHeader: boolean;
+  headerAllPages: boolean;
   headerFraction: number;
   redactTerms: string[];
   keepTerms: string[];
@@ -36,9 +37,10 @@ export interface Options {
 }
 export const DEFAULT_OPTIONS: Options = {
   useAi: false,
+  debugPdfText: false,
   enabledRules: [],
-  redactHeader: false,
-  headerFraction: 0.18,
+  headerAllPages: false,
+  headerFraction: 0,
   redactTerms: [],
   keepTerms: [],
   keepRegexes: [],

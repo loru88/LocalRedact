@@ -16,6 +16,78 @@ const run = async (text: string, enabledRules: string[]) =>
   ).text;
 
 describe("optional identifier rules", () => {
+  it.each([
+    ["GIORNO MESE ANNO", "29\n02\n2000"],
+    ["giorno\n mese\n anno", "1\n9\n1985"],
+    ["GIORNO\tMESE\u00a0ANNO", " 31 \r\n 12\r\n1999"],
+  ])(
+    "redacts valid form dates after %s while preserving labels and separators",
+    async (label, date) => {
+      const text = `😀 ${label}\n${date}\nComune`;
+      expect(await run(text, [])).toBe(text);
+      expect(await run(text, ["italianFormDate"])).toBe(
+        `😀 ${label}\n${date.replace(/\d+/g, "[REDACTED]")}\nComune`,
+      );
+    },
+  );
+  it.each([
+    "29\n02\n1900",
+    "29\n02\n2001",
+    "31\n04\n2000",
+    "00\n01\n2000",
+    "01\n00\n2000",
+    "01\n13\n2000",
+    "01\n01\n0000",
+    "01\n01\n99",
+    "01\n01\n20000",
+    "01\n\n01\n2000",
+    "01\nlabel\n01\n2000",
+    "01 01 2000",
+    "01\n01\n2000 extra",
+    "101\n01\n2000",
+  ])(
+    "leaves invalid dates or nonconsecutive numeric lines unchanged: %s",
+    async (date) => {
+      const text = `GIORNO MESE ANNO\n${date}`;
+      expect(await run(text, ["italianFormDate"])).toBe(text);
+    },
+  );
+  it("requires the label and handles repeated dates without shifting offsets", async () => {
+    const date = "GIORNO MESE ANNO\n15\n06\n1980";
+    const text = `15\n06\n1980\n${date}\n${date}`;
+    const redacted = "GIORNO MESE ANNO\n[REDACTED]\n[REDACTED]\n[REDACTED]";
+    expect(await run(text, ["italianFormDate"])).toBe(
+      `15\n06\n1980\n${redacted}\n${redacted}`,
+    );
+  });
+  it("keeps Italian payslip amounts clear with Moduli IT enabled", async () => {
+    const text =
+      "Retribuzione ordinaria 2.500,00\nNETTO DEL MESE\n1.950,00\nIRPEF 123,45";
+    expect(await run(text, [])).toBe(text);
+    const result = await processText(
+      sourceBytes(text),
+      { ...DEFAULT_OPTIONS, useAi: true, enabledRules: ["italianFiscalCode"] },
+      async (source) =>
+        [...source.matchAll(/\d[\d.]*,\d{2}/g)].map((match) => [
+          match.index,
+          match.index + match[0].length,
+        ]),
+    );
+    expect(result.text).toBe(text);
+  });
+  it("redacts generic and personal emails only when enabled, overriding keep rules", async () => {
+    const text =
+      "😀 Email: info@example.com; <Mario.Rossi+tax@sub.example.it>, info@example.com.";
+    expect(await run(text, [])).toBe(text);
+    expect(await run(text, ["email"])).toBe(
+      "😀 Email: [REDACTED]; <[REDACTED]>, [REDACTED].",
+    );
+  });
+  it("does not treat incomplete or split email addresses as common emails", async () => {
+    const text =
+      "name@localhost name@\nexample.com name..surname@example.com name@-example.com";
+    expect(await run(text, ["email"])).toBe(text);
+  });
   it("leaves identifiers and banking lines unchanged by default", async () => {
     const text =
       "BANCA ESEMPIO Conto 123456789\nIBAN IT60X0542811101000000123456\nRSSMRA80A01H501U";

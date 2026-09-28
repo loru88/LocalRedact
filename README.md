@@ -88,27 +88,30 @@ served and model assets must be downloaded/cached. There is no service worker.
 ## Rules and PDF handling
 
 - Identifier rules and PDF header removal are independently enabled and **off by
-  default**, with or without AI. There are no automatic banking-line rules
-  or salary-field exceptions.
-- **Italian fiscal codes**: matches the 16-character personal fiscal-code pattern,
-  without checksum validation. This optional matcher is isolated from the shared
-  processing code.
+  default**, with or without AI. There are no automatic banking-line rules.
+- **Moduli IT pack**: provides special handling for Modello 730 forms and
+  Italian payslips.
 - **IBAN bank accounts**: matches compact or space-separated international IBANs
   (case-insensitively, including nonbreaking spaces) using a modulo-97 checksum.
   Country-specific lengths and account existence are not validated. Invalid
   checksums and IBANs split across lines are not matched; use explicit terms for
   these cases. Only the matched number is selected, not the surrounding bank line.
   National formats are documented in the [SWIFT IBAN registry](https://www.swift.com/standards/data-standards/iban-international-bank-account-number).
-- **Redact PDF header text**: selects words in the top portion of every page;
-  the adjustable size starts at 18% when enabled. Images are not selected by this
-  rule. Image pixels underneath text redaction rectangles may still be removed.
+- **Email addresses**: optional rule for common email patterns, including generic
+  mailboxes such as `info@example.com`, regardless of AI predictions. Off by default;
+  overrides keep rules when enabled. Does not cover quoted local parts,
+  internationalized addresses or addresses split across lines.
+- **Header size (PDF only)**: starts at 0% (off). Set it above zero to remove
+  text in the top portion of the first page of each PDF. Select **Apply header
+  redaction to every page** to include subsequent pages. Images are not selected
+  by this rule; pixels underneath text redaction rectangles may still be removed.
 - Exact keep terms and JavaScript keep regexes override AI/header text matches.
   Explicit redact terms and enabled identifier rules override keep rules.
 - To add an identifier flag, add an entry to `src/identifierRules.ts` with a stable
   ID, label, description and detector returning UTF-16 spans. The UI and both
   document processors use that registry. `Options.enabledRules` selects its IDs;
-  `Options.redactHeader` separately enables PDF header text removal. Unknown rule
-  IDs are rejected.
+  `Options.headerFraction` sets the header size and `Options.headerAllPages`
+  extends header text removal beyond the first page. Unknown rule IDs are rejected.
 - Word coordinates are extracted from MuPDF character quads. A one-point margin
   is added and neighboring rectangles on the same line are joined.
 - Redactions remove covered text and image pixels rather than drawing a reversible
@@ -125,6 +128,12 @@ served and model assets must be downloaded/cached. There is no service worker.
   password-entry feature is included.
 
 ## Detection details
+
+Under **Advanced options**, **Debug: log extracted PDF text** logs each searchable
+page's original extracted text to the browser console before AI chunking and
+detection or redaction. It is off by default and also works with AI disabled.
+These local console logs can contain personal data; clear them after debugging.
+Text files are not logged.
 
 Per-token model scores are mapped through the tokenizer's reversible byte
 representation to the original text. The complete byte stream and token IDs must

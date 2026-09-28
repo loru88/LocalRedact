@@ -97,10 +97,20 @@ High-level approach:
 
 ## Optional detection rules
 
-- [x] Make processing general-purpose by default, with no automatic header removal,
-      salary-field protection or banking-line rules.
-- [x] Add independent opt-in flags for Italian fiscal codes, international IBANs
-      and PDF header text, with shared redact/keep precedence.
+- [x] Add an optional email rule that includes generic mailboxes independently of AI.
+- [x] Add an optional Modello 730 date rule for valid day/month/year values on
+      three consecutive lines immediately after `GIORNO MESE ANNO`.
+- [x] Group Italian rules for Modello 730 and payslip forms under the single
+      Moduli IT setting.
+- [ ] Reconstruct birth dates split across PDF fields using layout and label context,
+      retaining original offsets for redaction. Avoid joining unrelated numeric fields.
+- [x] Make processing general-purpose by default, with header removal off and
+      Italian form handling opt-in through Moduli IT. No banking-line rules run
+      automatically.
+- [x] Add independent opt-in flags for Italian fiscal codes and international
+      IBANs, with shared redact/keep precedence.
+- [x] Enable PDF header redaction above 0%, defaulting to the first page with an
+      option to apply it to every page.
 - [x] Use an extensible identifier-rule registry shared by PDF, TXT and the UI.
 - [x] Add regression coverage for flags, international IBANs and header images.
 - [ ] Show the exact enabled rules used for each completed result.

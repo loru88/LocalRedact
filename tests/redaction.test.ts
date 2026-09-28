@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as mupdf from "mupdf";
 import { DEFAULT_OPTIONS, type Options } from "../src/types";
 import { termSpans, textChunks, validateOptions } from "../src/rules";
@@ -9,11 +9,148 @@ const rules: Options = {
   ...DEFAULT_OPTIONS,
   useAi: false,
   enabledRules: ["italianFiscalCode", "iban"],
-  redactHeader: true,
+  headerFraction: 0.18,
   redactTerms: ["Mario Rossi"],
 };
 
 describe("saved PDF redaction", () => {
+  it("keeps common Italian payslip amounts clear of AI redaction", async () => {
+    const result = await processPdf(
+      fixture(),
+      { ...DEFAULT_OPTIONS, useAi: true, enabledRules: ["italianFiscalCode"] },
+      async (text) =>
+        [...text.matchAll(/\d[\d.]*,\d{2}/g)].map((match) => [
+          match.index,
+          match.index + match[0].length,
+        ]),
+      () => {},
+    );
+    const doc = new mupdf.PDFDocument(result.bytes);
+    const page = doc.loadPage(0);
+    try {
+      const text = extractPage(page).text;
+      expect(text).toContain("2.500,00");
+      expect(text).toContain("1.950,00");
+    } finally {
+      page.destroy();
+      doc.destroy();
+    }
+  });
+  it("keeps Italian payroll date lines clear of AI redaction when Moduli IT is enabled", async () => {
+    const input = fixture({ payrollDates: true });
+    const result = await processPdf(
+      input,
+      { ...DEFAULT_OPTIONS, useAi: true, enabledRules: ["italianFiscalCode"] },
+      async (text) => {
+        const spans: [number, number][] = [];
+        for (const value of ["AL 01/01/2026", "dal 1/1/2025 alla data"]) {
+          const index = text.indexOf(value);
+          if (index >= 0) spans.push([index, index + value.length]);
+        }
+        return spans;
+      },
+      () => {},
+    );
+    const doc = new mupdf.PDFDocument(result.bytes);
+    const page = doc.loadPage(0);
+    try {
+      const text = extractPage(page).text;
+      expect(text).toContain("AL 01/01/2026");
+      expect(text).toContain("dal 1/1/2025 alla data");
+    } finally {
+      page.destroy();
+      doc.destroy();
+    }
+  });
+  it.each([false, true])(
+    "removes split form dates from the saved PDF only when enabled (%s)",
+    async (enabled) => {
+      const result = await processPdf(
+        fixture({ formDate: true }),
+        {
+          ...DEFAULT_OPTIONS,
+          enabledRules: enabled ? ["italianFormDate"] : [],
+          keepTerms: ["29", "02", "2000"],
+        },
+        async () => {
+          throw new Error("Unexpected inference");
+        },
+        () => {},
+      );
+      const doc = new mupdf.PDFDocument(result.bytes);
+      const page = doc.loadPage(0);
+      try {
+        const text = extractPage(page).text;
+        expect(text).toContain("GIORNO MESE ANNO");
+        expect(text).toContain("Unrelated value: 12345");
+        for (const value of ["29", "02", "2000"]) {
+          expect(text.split(/\s+/).includes(value)).toBe(!enabled);
+        }
+      } finally {
+        page.destroy();
+        doc.destroy();
+      }
+    },
+  );
+  it("permanently removes a generic email with the email rule and AI off", async () => {
+    const result = await processPdf(
+      fixture(),
+      {
+        ...DEFAULT_OPTIONS,
+        enabledRules: ["email"],
+        keepTerms: ["info@example.com"],
+      },
+      async () => {
+        throw new Error("Unexpected inference");
+      },
+      () => {},
+    );
+    const doc = new mupdf.PDFDocument(result.bytes);
+    const page = doc.loadPage(0);
+    try {
+      const text = extractPage(page).text;
+      expect(text).not.toContain("info@example.com");
+      expect(text).toContain("Email:");
+      expect(text).toContain("Mario Rossi");
+      expect(result.marks).toBeGreaterThan(0);
+    } finally {
+      page.destroy();
+      doc.destroy();
+    }
+  });
+  it.each([false, true])(
+    "logs exact page text before inference only when debug is enabled (%s)",
+    async (debugPdfText) => {
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      let calls = 0;
+      try {
+        await processPdf(
+          fixture({ secondPage: "text" }),
+          { ...DEFAULT_OPTIONS, useAi: true, debugPdfText },
+          async (text) => {
+            calls++;
+            expect(text).toContain("Mario Rossi");
+            if (debugPdfText) {
+              expect(log).toHaveBeenCalledTimes(calls);
+              expect(log).toHaveBeenLastCalledWith(
+                `[LocalRedact] Extracted PDF text — page ${calls}/2`,
+                text,
+              );
+            } else {
+              expect(log).not.toHaveBeenCalled();
+            }
+            return [];
+          },
+          () => {},
+        );
+        expect(calls).toBe(2);
+        expect(DEFAULT_OPTIONS.debugPdfText).toBe(false);
+      } finally {
+        log.mockRestore();
+      }
+    },
+  );
+
   it("leaves header text, banking lines and identifiers intact with flags off", async () => {
     const result = await processPdf(
       fixture(),
@@ -39,6 +176,50 @@ describe("saved PDF redaction", () => {
       doc.destroy();
     }
   });
+
+  it.each([
+    [0, false],
+    [0, true],
+    [0.18, false],
+    [0.18, true],
+  ] as const)(
+    "uses header percentage %s and every-page setting %s",
+    async (headerFraction, headerAllPages) => {
+      const result = await processPdf(
+        fixture({ secondPage: "text" }),
+        {
+          ...DEFAULT_OPTIONS,
+          headerFraction,
+          headerAllPages,
+          redactTerms: ["Mario Rossi"],
+          keepTerms: ["Gennaio 2026"],
+        },
+        async () => {
+          throw new Error("Unexpected inference");
+        },
+        () => {},
+      );
+      const doc = new mupdf.PDFDocument(result.bytes);
+      try {
+        expect(doc.countPages()).toBe(2);
+        for (let i = 0; i < 2; i++) {
+          const page = doc.loadPage(i);
+          try {
+            const text = extractPage(page).text;
+            expect(text.includes("ACME")).toBe(
+              !(headerFraction > 0 && (i === 0 || headerAllPages)),
+            );
+            expect(text).toContain("Gennaio 2026");
+            expect(text).not.toContain("Mario Rossi");
+          } finally {
+            page.destroy();
+          }
+        }
+      } finally {
+        doc.destroy();
+      }
+    },
+  );
 
   it("preserves header images while permanently removing header text", async () => {
     const input = fixture({ headerImage: true });

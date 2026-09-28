@@ -148,24 +148,23 @@ test("TXT model download failure does not export a rules-only result", async ({
   ).toBeChecked();
 });
 
-test("identifier flags independently control TXT processing", async ({
+test("Moduli IT and identifier flags control TXT processing", async ({
   page,
 }) => {
   await page.goto("/");
   await page.getByLabel("add AI detection", { exact: true }).uncheck();
-  await expect(
-    page.getByLabel("Italian fiscal codes", { exact: true }),
-  ).not.toBeChecked();
+  await expect(page.getByLabel("Moduli IT", { exact: true })).not.toBeChecked();
   await expect(
     page.getByLabel("IBAN bank accounts", { exact: true }),
   ).not.toBeChecked();
   await expect(
-    page.getByLabel("Redact PDF header text", { exact: true }),
+    page.getByLabel("Apply header redaction to every page", { exact: true }),
   ).not.toBeChecked();
   await expect(
     page.getByLabel("Header size (PDF only)", { exact: true }),
-  ).toBeDisabled();
+  ).toHaveValue("0");
   await page.getByLabel("IBAN bank accounts", { exact: true }).check();
+  await page.getByLabel("Moduli IT", { exact: true }).check();
   await page.locator("input[type=file]").setInputFiles({
     name: "accounts.txt",
     mimeType: "text/plain",
@@ -175,6 +174,6 @@ test("identifier flags independently control TXT processing", async ({
     .getByRole("button", { name: "Redact document", exact: true })
     .click();
   await expect(page.getByLabel("Redacted text document")).toHaveText(
-    "BANCA [REDACTED]\nRSSMRA80A01H501U",
+    "BANCA [REDACTED]\n[REDACTED]",
   );
 });

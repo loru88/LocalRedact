@@ -4,6 +4,36 @@ import { extractPage } from "../../src/pdf";
 import { test, expect } from "@playwright/test";
 import { fixture } from "../fixture";
 
+test("PDF debug option logs worker extraction with AI off", async ({
+  page,
+}) => {
+  const logs: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "log") logs.push(message.text());
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: /Load sample/ }).click();
+  await page.getByText("Advanced options", { exact: true }).click();
+  const debug = page.getByLabel("Debug: log extracted PDF text", {
+    exact: true,
+  });
+  await expect(debug).not.toBeChecked();
+  await debug.check();
+  await page
+    .getByRole("button", { name: "Redact document", exact: true })
+    .click();
+  await expect(
+    page.getByRole("link", { name: "Download document" }),
+  ).toBeVisible({ timeout: 30000 });
+  expect(
+    logs.some(
+      (text) =>
+        text.includes("[LocalRedact] Extracted PDF text — page 1/") &&
+        text.includes("Mario Rossi"),
+    ),
+  ).toBe(true);
+});
+
 test("processes and downloads PDFs entirely locally in the production build", async ({
   page,
 }) => {
@@ -60,6 +90,14 @@ test("AI is an optional addition and text file guidance uses plain language", as
 }) => {
   await page.goto("/");
   const ai = page.getByLabel("add AI detection", { exact: true });
+  const email = page.getByLabel("Email addresses", { exact: true });
+  const italianPack = page.getByLabel("Moduli IT", { exact: true });
+  await expect(italianPack).not.toBeChecked();
+  await italianPack.check();
+  await expect(italianPack).toBeChecked();
+  await expect(email).not.toBeChecked();
+  await email.check();
+  await expect(email).toBeChecked();
   await expect(ai).not.toBeChecked();
   await expect(
     page.getByText("Rules match known patterns and terms you enter.", {
@@ -229,13 +267,32 @@ test("cancels model loading and can restart in the explicitly selected rules mod
   ).toBeVisible();
 });
 
-test("PDF header text flag controls the saved output", async ({ page }) => {
+test("PDF header percentage and page selection control the saved output", async ({
+  page,
+}) => {
   await page.goto("/");
-  for (const enabled of [false, true]) {
-    await page.getByRole("button", { name: /Load sample/ }).click();
-    await page
-      .getByLabel("Redact PDF header text", { exact: true })
-      .setChecked(enabled);
+  const header = page.getByLabel("Header size (PDF only)", { exact: true });
+  const allPages = page.getByLabel("Apply header redaction to every page", {
+    exact: true,
+  });
+  await expect(header).toBeEnabled();
+  await expect(header).toHaveValue("0");
+  await expect(allPages).not.toBeChecked();
+  await expect(
+    page.getByLabel("Redact PDF header text", { exact: true }),
+  ).toHaveCount(0);
+  for (const [percentage, everyPage] of [
+    [18, false],
+    [18, true],
+    [0, true],
+  ] as const) {
+    await page.locator("input[type=file]").setInputFiles({
+      name: "two-pages.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(fixture({ secondPage: "text" })),
+    });
+    await header.fill(String(percentage));
+    await allPages.setChecked(everyPage);
     await page
       .getByRole("button", { name: "Redact document", exact: true })
       .click();
@@ -244,11 +301,19 @@ test("PDF header text flag controls the saved output", async ({ page }) => {
     const doc = new mupdf.PDFDocument(
       await readFile((await (await download).path())!),
     );
-    const pdfPage = doc.loadPage(0);
     try {
-      expect(extractPage(pdfPage).text.includes("ACME")).toBe(!enabled);
+      expect(doc.countPages()).toBe(2);
+      for (let i = 0; i < 2; i++) {
+        const pdfPage = doc.loadPage(i);
+        try {
+          expect(extractPage(pdfPage).text.includes("ACME")).toBe(
+            !(percentage > 0 && (i === 0 || everyPage)),
+          );
+        } finally {
+          pdfPage.destroy();
+        }
+      }
     } finally {
-      pdfPage.destroy();
       doc.destroy();
     }
     await page.getByRole("button", { name: "Clear files" }).click();

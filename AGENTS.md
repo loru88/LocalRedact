@@ -22,9 +22,10 @@ is sufficient; Vite's relative base supports deployment under a subfolder.
 Supported today: searchable PDFs, TXT files, multiple PDF pages, mixed batches,
 rules-only processing, optional AI detection and saved-output previews. PDF content
 is permanently redacted; TXT matches are replaced with `[REDACTED]`.
-Identifier rules (Italian fiscal codes and international IBANs) and PDF header
-text removal are independent flags, off by default. No banking-line rules or
-salary-field protection apply. Word, OCR, barcode detection, standalone images
+Identifier rules (emails, Modello 730 dates, Italian fiscal codes and international IBANs) and PDF header
+text removal are off by default. Header size starts at 0%; a positive percentage
+applies to the first page unless `headerAllPages` is checked. Moduli IT provides
+special handling for Italian document forms; no banking-line rules apply. Word, OCR, barcode detection, standalone images
 and manual redaction controls remain planned features.
 
 AI uses `openai/privacy-filter` with q4 weights, approximately 917 MB plus runtime
