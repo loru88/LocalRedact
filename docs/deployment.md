@@ -57,6 +57,13 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
+Publish a GitHub release for that tag so the footer's release link resolves.
+The workflow embeds the commit SHA and Git ref in the build using
+`LOCALREDACT_GIT_SHA` and `LOCALREDACT_GIT_REF`. The footer shows the short SHA
+and links to that tag's release page. A manually dispatched build from a branch
+links to its commit instead; builds without this metadata show **local** and
+link to the GitHub releases list.
+
 The tagged workflow checks out that commit, installs from the committed
 `package-lock.json`, runs the tests and build, installs `lftp`, and uploads
 `dist/` only if all validation steps succeed. A failed test or build prevents
@@ -76,6 +83,8 @@ After a successful upload:
    `localredact` subfolder.
 4. Load the sample document and verify the client-side application responds.
 5. Confirm that files outside the `localredact` destination remain unchanged.
+6. Confirm that the footer shows the intended commit revision and links to the
+   corresponding GitHub release.
 
 ## Rollback
 

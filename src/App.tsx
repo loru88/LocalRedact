@@ -792,7 +792,17 @@ export default function App() {
           </aside>
         </div>
         <footer>
-          <span>LocalRedact</span>
+          <span>
+            LocalRedact ·{" "}
+            <a
+              href={__APP_REVISION_URL__}
+              target="_blank"
+              rel="noreferrer"
+              title="View on GitHub"
+            >
+              {__APP_REVISION__}
+            </a>
+          </span>
           <span>Scanned pages need OCR first · No document uploads</span>
         </footer>
       </main>

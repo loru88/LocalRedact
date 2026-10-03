@@ -36,6 +36,9 @@ jobs:
         run: npm test
 
       - name: Build static site
+        env:
+          LOCALREDACT_GIT_SHA: ${{ github.sha }}
+          LOCALREDACT_GIT_REF: ${{ github.ref }}
         run: npm run build
 
       - name: Upload build artifact

@@ -35,6 +35,12 @@ Deploy `dist/` to any static HTTPS host. Relative asset paths also support hosti
 in a subfolder. Do not open `index.html` using `file://`; workers and model loading
 need HTTP(S). No server-side application runtime is required.
 
+The footer shows the deployed commit revision and links to its GitHub release.
+Manual deployments from a branch link to the commit instead. The deployment
+workflow supplies `LOCALREDACT_GIT_SHA` and `LOCALREDACT_GIT_REF` at build time;
+without this metadata, local development and builds show **local** and link to
+the repository's GitHub releases list.
+
 ## Rules and optional AI
 
 Enabled rules, the PDF header option and redact/keep terms apply whether AI is
